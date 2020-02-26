@@ -188,10 +188,3 @@ class TD3:
 
             for callback in callbacks:
                 callback(self)
-
-
-if __name__ == '__main__':
-    env = gym.make("Pendulum-v0")
-    actor = actor(env, output_activation=nn.Tanh, deterministic=True)
-    critics = [critic(env), critic(env)]
-    TD3(env).train(actor, critics)
