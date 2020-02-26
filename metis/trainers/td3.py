@@ -4,11 +4,10 @@ from itertools import chain
 
 import gym
 import torch
-from torch import nn, Tensor
+from torch import Tensor
 from torch.optim import Adam
 
 from metis import base, utils
-from metis.agents import actor, critic
 from metis.replay import ExperienceReplay
 
 
