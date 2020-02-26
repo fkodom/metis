@@ -190,12 +190,3 @@ class SAC:
 
             for callback in callbacks:
                 callback(self)
-
-
-if __name__ == "__main__":
-    from metis.agents import actor, critic
-
-    env = utils.torchenv(gym.make("CartPole-v1"))
-    actor = actor(env, squashed=True)
-    critics = [critic(env), critic(env)]
-    SAC(env).train(actor, critics)
