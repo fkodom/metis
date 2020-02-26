@@ -13,15 +13,49 @@ LOG_STD_MIN = -20
 LOG_STD_MAX = 2
 
 
-def actor(env: gym.Env, hidden_sizes=(64, 64), activation=nn.ReLU, squashed=False) -> base.Actor:
+def actor(
+    env: gym.Env,
+    hidden_sizes=(64, 64),
+    activation=nn.ReLU,
+    output_activation=nn.Identity,
+    action_limit=1.0,
+    deterministic=False,
+    squashed=False,
+) -> base.Actor:
     obs_space = env.observation_space
     act_space = env.action_space
     if isinstance(act_space, gym.spaces.Discrete):
-        return CategoricalActor(obs_space.shape[0], act_space.n, hidden_sizes, activation)
+        return CategoricalActor(
+            obs_space.shape[0],
+            act_space.n,
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+        )
+    elif deterministic:
+        return DeterministicActor(
+            obs_space.shape[0],
+            act_space.shape[0],
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+            output_activation=output_activation,
+            action_limit=action_limit,
+        )
     elif squashed:
-        return SquashedGaussianActor(obs_space.shape[0], act_space.shape[0], hidden_sizes)
+        return SquashedGaussianActor(
+            obs_space.shape[0],
+            act_space.shape[0],
+            hidden_sizes=hidden_sizes,
+            action_limit=action_limit,
+        )
     else:
-        return GaussianActor(obs_space.shape[0], act_space.shape[0], hidden_sizes, activation)
+        return GaussianActor(
+            obs_space.shape[0],
+            act_space.shape[0],
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+            output_activation=output_activation,
+            action_limit=action_limit,
+        )
 
 
 def critic(env: gym.Env, hidden_sizes=(64, 64), activation=nn.Tanh) -> base.Critic:
@@ -33,10 +67,41 @@ def critic(env: gym.Env, hidden_sizes=(64, 64), activation=nn.Tanh) -> base.Crit
         return QNetwork(obs_space.shape[0], act_space.n, hidden_sizes, activation)
 
 
-class CategoricalActor(base.Actor):
-    def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64), activation=nn.Tanh):
+class DeterministicActor(base.Actor):
+    def __init__(
+        self,
+        obs_dim,
+        act_dim,
+        hidden_sizes=(64, 64),
+        activation=nn.Tanh,
+        output_activation=nn.Identity,
+        action_limit=1.0,
+    ):
         super().__init__()
-        self.logits = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)
+        self.action_limit = action_limit
+        self.layers = mlp(
+            [obs_dim, *hidden_sizes, act_dim],
+            activation=activation,
+            output_activation=output_activation,
+        )
+
+    def forward(self, state, action=None) -> (Tensor, Tensor):
+        return self.action_limit * self.layers(state), None
+
+
+class CategoricalActor(base.Actor):
+    def __init__(
+        self,
+        obs_dim,
+        act_dim,
+        hidden_sizes=(64, 64),
+        activation=nn.Tanh,
+    ):
+        super().__init__()
+        self.logits = mlp(
+            [obs_dim, *hidden_sizes, act_dim],
+            activation=activation,
+        )
 
     def forward(self, obs, action=None) -> (Tensor, Tensor):
         probs = torch.softmax(self.logits(obs), dim=-1)
@@ -48,15 +113,28 @@ class CategoricalActor(base.Actor):
 
 
 class GaussianActor(base.Actor):
-    def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64), activation=nn.Tanh):
+    def __init__(
+        self,
+        obs_dim,
+        act_dim,
+        hidden_sizes=(64, 64),
+        activation=nn.Tanh,
+        output_activation=nn.Identity,
+        action_limit=1.0,
+    ):
         super().__init__()
-        self.mu = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)
+        self.action_limit = action_limit
+        self.mu = mlp(
+            [obs_dim, *hidden_sizes, act_dim],
+            activation=activation,
+            output_activation=output_activation,
+        )
         self.log_sigma = torch.nn.Parameter(
             -0.5 * torch.ones(act_dim, dtype=torch.float), requires_grad=True
         )
 
     def forward(self, state, action=None) -> (Tensor, Tensor):
-        mu = self.mu(state)
+        mu = self.action_limit * self.mu(state)
         std = torch.exp(self.log_sigma)
         dist = Normal(mu, std)
 
@@ -68,10 +146,11 @@ class GaussianActor(base.Actor):
 
 
 class SquashedGaussianActor(base.Actor):
-    def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64),
-                 act_limit: float = 1.0):
+    def __init__(
+        self, obs_dim, act_dim, hidden_sizes=(64, 64), action_limit: float = 1.0
+    ):
         super().__init__()
-        self.act_limit = act_limit
+        self.action_limit = action_limit
         self.mu = mlp([obs_dim] + list(hidden_sizes) + [act_dim], nn.ReLU)
         self.log_sigma = torch.nn.Parameter(
             -0.5 * torch.ones(act_dim, dtype=torch.float), requires_grad=True
@@ -89,7 +168,7 @@ class SquashedGaussianActor(base.Actor):
         # This is a more numerically-stable equivalent to Eq 21.
         logprob = dist.log_prob(action).sum(dim=-1)
         logprob -= 2 * (log(2) - action - f.softplus(-2 * action)).sum(dim=-1)
-        action = self.act_limit * torch.tanh(action)
+        action = self.action_limit * torch.tanh(action)
 
         return action, logprob
 
