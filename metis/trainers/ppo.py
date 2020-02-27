@@ -1,3 +1,10 @@
+"""
+metis/trainers/ppo.py
+---------------------
+Proximal Policy Optimization (PPO) algorithm for training RL agents in both
+continuous and discrete action spaces.
+"""
+
 from typing import Iterable, Callable
 
 import gym
@@ -18,6 +25,24 @@ def actor_loss(
     gamma: float = 0.99,
     lam: float = 0.97,
 ) -> (Tensor, float):
+    """Computes loss for the actor network, as well as the approximate
+    KL-divergence (used for early stopping of each training update).
+
+    Parameters
+    ----------
+    actor: (base.Actor) Actor (policy) network to optimize.
+    critic: (base.Critic) Critic network to optimize.
+    gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+    clip_ratio: (float, optional) Hyperparameter for clipping in the policy
+        objective.  Scales how much the policy is allowed change per
+        training update.  Default: 0.2.
+    lam: (float, optional) Hyperparameter for GAE-Lambda calaulation.
+        Range: (0, 1).  Default: 0.97
+
+    Returns
+    -------
+    (Tensor, float):  Actor loss, KL divergence
+    """
     states, actions, old_logprobs, rewards, dones, next_states = batch
     with torch.no_grad():
         if isinstance(critic, QNetwork):
@@ -47,6 +72,17 @@ def actor_loss(
 
 
 def critic_loss(batch, critic: base.Critic, gamma: float = 0.99) -> Tensor:
+    """Computes loss for critic networks.
+
+    Parameters
+    ----------
+    critic: (base.Critic) Critic network to optimize.
+    gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+
+    Returns
+    -------
+    Tensor:  Critic loss
+    """
     states, actions, _, rewards, dones, _ = batch
     returns = torch.zeros_like(rewards)
     returns[:-1] = utils.discount_values(rewards, dones, gamma)[:-1]
@@ -59,6 +95,21 @@ def critic_loss(batch, critic: base.Critic, gamma: float = 0.99) -> Tensor:
 
 
 class PPO:
+    """Proximal Policy Optimization (PPO) algorithm for training RL agents in
+    both continuous and discrete action spaces.  (arxiv:1707.06347 [cs.LG])
+
+    PPO is known for being extremely stable during training.  It has been used
+    for many famous experiments, such as
+    [OpenAI Five](https://openai.com/blog/openai-five/) for that reason.  PPO
+    is an on-policy algorithm, which makes it less sample efficient than other
+    actor-critic models like SAC, DDPG, or TD3.  However, it is usually much
+    more efficient than A2C or VPG, since each training epoch continues to update
+    until a target KL divergence has been reached.  This means that samples are
+    almost always used more than once before being thrown away.  The actor
+    network uses a *stochastic* policy, where the action uncertainty is
+    parameterized by the network (not artificially added, as in DDPG or TD3).
+    """
+
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
@@ -84,16 +135,21 @@ class PPO:
 
         Parameters
         ----------
-        actor
-        critic
-        train_actor_iters: (int) Max number of actor training steps per epoch.
-        train_critic_iters: (int) Max number of critic training steps per epoch.
-        clip_ratio: (float) Hyperparameter for clipping in the policy objective.
-            Scales how much the policy is allowed change per training update.
-        gamma: (float) Discount factor. Range: (0, 1)
-        lam:: (float) Hyperparameter for GAE-Lambda calaulation. Range: (0, 1)
-        target_kl: (float) Max KL divergence between new and old policies after
-            an update. Used for early stopping. Typically in range (0.01, 0.05)
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critic: (base.Critic) Critic network to optimize.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        train_actor_iters: (int, optional) Max number of actor training steps
+            per epoch.  Default: 80.
+        train_critic_iters: (int, optional) Max number of critic training steps
+            per epoch.  Default: 80.
+        clip_ratio: (float, optional) Hyperparameter for clipping in the policy
+            objective.  Scales how much the policy is allowed change per
+            training update.  Default: 0.2.
+        lam: (float, optional) Hyperparameter for GAE-Lambda calaulation.
+            Range: (0, 1).  Default: 0.97
+        target_kl: (float, optional) Max KL divergence between new and old
+            policies after an update. Used for early stopping. Typically in
+            range (0.01, 0.05).  Default: 0.01.
         """
         batch = self.replay.sample()
 
@@ -123,11 +179,11 @@ class PPO:
         train_critic_iters: int = 80,
         epochs: int = 200,
         steps_per_epoch: int = 4000,
-        max_ep_len: int = 1000,
         clip_ratio: float = 0.2,
         gamma: float = 0.99,
         lam: float = 0.97,
         target_kl: float = 0.01,
+        max_ep_len: int = 1000,
         callbacks: Iterable[Callable] = (),
     ):
         """Proximal Policy Optimization (via objective clipping) with early
@@ -135,24 +191,35 @@ class PPO:
 
         Parameters
         ----------
-        actor
-        critic
-        replay
-        actor_lr: (float) Learning rate for actor optimizer.
-        critic_lr: (float) Learning rate for critic optimizer.
-        train_actor_iters: (int) Max number of actor training steps per epoch.
-        train_critic_iters: (int) Max number of critic training steps per epoch.
-        epochs: (int) Number of training epochs (number of policy updates)
-        steps_per_epoch: (int) Number of environment steps (or turns) per epoch
-        max_ep_len: (int) Max length of an environment episode (or game)
-        clip_ratio: (float) Hyperparameter for clipping in the policy objective.
-            Scales how much the policy is allowed change per training update.
-        gamma: (float) Discount factor. Range: (0, 1)
-        lam: (float) Hyperparameter for GAE-Lambda calaulation. Range: (0, 1)
-        target_kl: (float) Max KL divergence between new and old policies after
-            an update. Used for early stopping. Typically in range (0.01, 0.05)
-        callbacks: (Iterable[Callable]) Collection of callback functions to
-            execute at the end of each training epoch.
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critic: (base.Critic) Critic network to optimize.
+        replay: (base.Replay, optional) Experience replay object for sampling
+            previous experiences.  If not provided, defaults to 'ExperienceReplay'
+            with a buffer size of 1,000,000.  Users can provide a replay object,
+            which is pre-populated with experiences (for specific use cases).
+        steps_per_epoch: (int, optional) Number of steps of interaction
+            for the agent and the environment in each epoch.  Default: 4000.
+        epochs: (int, optional) Number of training epochs.  Default:  100.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        actor_lr: (float, optional) Learning rate actor optimizer.  Default: 1e-3.
+        critic_lr: (float, optional) Learning rate critic optimizer.  Default: 1e-3.
+        train_actor_iters: (int, optional) Max number of actor training steps
+            per epoch.  Default: 80.
+        train_critic_iters: (int, optional) Max number of critic training steps
+            per epoch.  Default: 80.
+        clip_ratio: (float, optional) Hyperparameter for clipping in the policy
+            objective.  Scales how much the policy is allowed change per
+            training update.  Default: 0.2.
+        lam: (float, optional) Hyperparameter for GAE-Lambda calaulation.
+            Range: (0, 1).  Default: 0.97
+        target_kl: (float, optional) Max KL divergence between new and old
+            policies after an update. Used for early stopping. Typically in
+            range (0.01, 0.05).  Default: 0.01.
+        max_ep_len: (int, optional) Maximum length of episode.  Defaults to 1000,
+            but *this should be provided for each unique environment!*  This
+            has an effect on how end-of-episode rewards are computed.
+        callbacks: (Iterable[Callable], optional) callback functions to execute
+            at the end of each training epoch.
         """
         self.actor_optimizer = Adam(actor.parameters(), lr=actor_lr)
         self.critic_optimizer = Adam(critic.parameters(), lr=critic_lr)
