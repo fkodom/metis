@@ -10,4 +10,4 @@ actor = agents.actor(env)
 critic = agents.critic(env)
 trainer = A2C(env)
 
-trainer.fit(actor, critic)
+trainer.train(actor, critic)

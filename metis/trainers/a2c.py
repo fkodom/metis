@@ -93,7 +93,7 @@ class A2C:
             critic_loss(batch, critic, gamma=gamma).backward()
             self.critic_optimizer.step()
 
-    def fit(
+    def train(
         self,
         actor: base.Actor,
         critic: base.Critic,

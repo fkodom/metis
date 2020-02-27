@@ -49,7 +49,7 @@ class VPG:
         actor_loss(batch, actor, gamma=gamma).backward()
         self.optimizer.step()
 
-    def fit(
+    def train(
         self,
         actor: base.Actor,
         replay: base.Replay = None,

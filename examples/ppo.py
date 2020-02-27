@@ -9,4 +9,4 @@ actor = agents.actor(env)
 critic = agents.critic(env)
 trainer = PPO(env)
 
-trainer.fit(actor, critic)
+trainer.train(actor, critic)
