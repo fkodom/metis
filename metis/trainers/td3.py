@@ -37,7 +37,7 @@ def actor_loss(batch, actor: base.Actor, critics: Iterable[base.Critic]) -> Tens
 
 
 class TD3:
-    """Time-Delayed Deep Deterministic (TD3) Policy Gradients algorithm for
+    """Twin-Delayed Deep Deterministic (TD3) Policy Gradients algorithm for
     training RL agents in continuous action spaces.  Requires the actor network
     to have a *deterministic* policy (i.e. no random sampling -- predicts the
     expected value).  (arxiv:1802.09477 [cs.AI])
