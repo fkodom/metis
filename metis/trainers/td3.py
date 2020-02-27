@@ -1,7 +1,7 @@
 """
 metis/trainers/td3.py
 ---------------------
-Time-Delayed Deep Deterministic (TD3) Policy Gradients algorithm for training RL
+Twin-Delayed Deep Deterministic (TD3) Policy Gradients algorithm for training RL
 agents in continuous action spaces.  Requires the actor network to have a
 *deterministic* policy (i.e. no random sampling -- predicts the expected value).
 """
@@ -179,7 +179,7 @@ class TD3:
         max_ep_len: int = 1000,
         callbacks: Iterable[Callable] = (),
     ):
-        """Time-Delayed Deep Deterministic (TD3) Policy Gradients training
+        """Twin-Delayed Deep Deterministic (TD3) Policy Gradients training
         algorithm.  Supports only *deterministic* policies in *continuous*
         action spaces.
 
