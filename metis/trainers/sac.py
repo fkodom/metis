@@ -1,4 +1,11 @@
-from typing import Union, Iterable, Callable
+"""
+metis/trainers/sac.py
+---------------------
+Soft actor-critic algorithm for training RL agents in both continuous and
+discrete action spaces.
+"""
+
+from typing import Union, Iterable, Sequence, Callable
 from copy import deepcopy
 from itertools import chain
 
@@ -12,11 +19,24 @@ from metis.agents import QNetwork
 
 
 def actor_loss(
-    batch,
+    batch: Sequence[Tensor or Sequence[Tensor]],
     actor: base.Actor,
     critics: Iterable[base.Critic],
     alpha: Union[float, Tensor] = 0.2,
 ) -> (Tensor, Tensor):
+    """Computes loss for actor network.
+
+    Parameters
+    ----------
+    batch: (Sequence[Tensor or Sequence[Tensor]]) Sampled batch of past
+        experiences for the agent being trained.
+    actor: (base.Actor) Actor (policy) network to optimize.
+    critics: (Iterable[base.Critic]) Critic networks to optimize. In standard
+        SAC there are *two* critics, but this method only requires that *two or
+        more* critics are provided.
+    alpha: (float, optional) Entropy regularization coefficient. (Equivalent to
+        inverse of reward scale in the original SAC paper.)  Default: 0.2.
+    """
     states = batch[0]
     actions, logprobs = actor(states)
     if any(isinstance(c, QNetwork) for c in critics):
@@ -28,6 +48,17 @@ def actor_loss(
 
 
 class SAC:
+    """Soft actor-critic algorithm for training RL agents in both continuous and
+    discrete action spaces.  (arxiv:1801.01290 [cs.LG])
+
+    SAC is very sample efficient, compared to other actor-critic algorithms like
+    A3C or PPO, because it repeatedly samples from past experiences using an
+    Experience Replay.  This is made possible by including *target* networks,
+    which are used to bootstrap the action values for training the policy.  The
+    actor network uses a *stochastic* policy, where the action uncertainty is
+    parameterized by the network (not artificially added, as in DDPG or TD3).
+    """
+
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
@@ -40,12 +71,27 @@ class SAC:
 
     def critic_loss(
         self,
-        batch,
+        batch: Sequence[Tensor or Sequence[Tensor]],
         actor: base.Actor,
         critics: Iterable[base.Critic],
         gamma: float = 0.99,
         alpha: Union[float, Tensor] = 0.2,
     ) -> Tensor:
+        """Computes loss for critic networks when they are not instances of 'QNetwork'
+        (i.e. the critics return a single value for the chosen action)
+
+        Parameters
+        ----------
+        batch: (Sequence[Tensor or Sequence[Tensor]]) Sampled batch of past
+            experiences for the agent being trained.
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critics: (Iterable[base.Critic]) Critic networks to optimize. In standard
+            SAC there are *two* critics, but this method only requires that *two or
+            more* critics are provided.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        alpha: (float, optional) Entropy regularization coefficient. (Equivalent to
+            inverse of reward scale in the original SAC paper.)  Default: 0.2.
+        """
         states, actions, rewards, dones, next_states = batch
 
         with torch.no_grad():
@@ -59,12 +105,28 @@ class SAC:
 
     def q_network_loss(
         self,
-        batch,
+        batch: Sequence[Tensor or Sequence[Tensor]],
         actor: base.Actor,
         critics: Iterable[base.Critic],
         gamma: float = 0.99,
         alpha: Union[float, Tensor] = 0.2,
     ) -> Tensor:
+        """Computes loss for critic networks when they are instances of 'QNetwork'
+        (i.e. the critics return an array of values, one for each possible discrete
+        action, rather than a single value for the chosen action)
+
+        Parameters
+        ----------
+        batch: (Sequence[Tensor or Sequence[Tensor]]) Sampled batch of past
+            experiences for the agent being trained.
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critics: (Iterable[base.Critic]) Critic networks to optimize. In standard
+            SAC there are *two* critics, but this method only requires that *two or
+            more* critics are provided.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        alpha: (float, optional) Entropy regularization coefficient. (Equivalent to
+            inverse of reward scale in the original SAC paper.)  Default: 0.2.
+        """
         states, actions, rewards, dones, next_states = batch
 
         with torch.no_grad():
@@ -85,6 +147,21 @@ class SAC:
         alpha: Union[float, Tensor] = 0.2,
         polyak: float = 0.995,
     ):
+        """Samples from the experience replay and performs a single SAC update.
+
+        Parameters
+        ----------
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critics: (Iterable[base.Critic]) Critic networks to optimize. In standard
+            SAC there are *two* critics, but this method only requires that *two or
+            more* critics are provided.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        polyak: (float, optional) Interpolation factor in polyak averaging for
+            target networks.  Range: (0, 1).  Default: 0.995
+        alpha: (float, optional) Entropy regularization coefficient. (Equivalent to
+            inverse of reward scale in the original SAC paper.)  Default: 0.2.
+        batch_size: (int, optional) Minibatch size for SGD.  Default: 128.
+        """
         batch = self.replay.sample(batch_size)
 
         self.critic_optimizer.zero_grad()
@@ -118,31 +195,47 @@ class SAC:
         start_steps: int = 4000,
         update_after: int = 1000,
         update_every: int = 1,
-        max_ep_len: int = 200,
+        max_ep_len: int = 1000,
         callbacks: Iterable[Callable] = (),
     ):
-        """
-        Args:
-            steps_per_epoch (int): Number of steps of interaction (state-action pairs)
-                for the agent and the environment in each epoch.
-            epochs (int): Number of epochs to run and train agent.
-            gamma (float): Discount factor. (Always between 0 and 1.)
-            polyak (float): Interpolation factor in polyak averaging for target
-                networks. Range: (0, 1)
-            actor_lr (float): Learning rate (used for both policy and value learning).
-            alpha (float): Entropy regularization coefficient. (Equivalent to
-                inverse of reward scale in the original SAC paper.)
-            batch_size (int): Minibatch size for SGD.
-            start_steps (int): Number of steps for uniform-random action selection,
-                before running real policy. Helps exploration.
-            update_after (int): Number of env interactions to collect before
-                starting to do gradient descent updates. Ensures replay buffer
-                is full enough for useful updates.
-            update_every (int): Number of env interactions that should elapse
-                between gradient descent updates. Note: Regardless of how long
-                you wait between updates, the ratio of env steps to gradient steps
-                is locked to 1.
-            max_ep_len (int): Maximum length of trajectory / episode / rollout.
+        """Soft actor-critic (SAC) training algorithm.  Supports both continuous
+        and discrete action spaces.
+
+        Parameters
+        ----------
+        actor: (base.Actor) Actor (policy) network to optimize.
+        critics: (Iterable[base.Critic]) Critic networks to optimize. In standard
+            SAC there are *two* critics, but this method only requires that *two or
+            more* critics are provided.
+        replay: (base.Replay, optional) Experience replay object for sampling
+            previous experiences.  If not provided, defaults to 'ExperienceReplay'
+            with a buffer size of 1,000,000.  Users can provide a replay object,
+            which is pre-populated with experiences (for specific use cases).
+        steps_per_epoch: (int, optional) Number of steps of interaction
+            for the agent and the environment in each epoch.  Default: 4000.
+        epochs: (int, optional) Number of training epochs.  Default:  100.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        polyak: (float, optional) Interpolation factor in polyak averaging for
+            target networks.  Range: (0, 1).  Default: 0.995
+        actor_lr: (float, optional) Learning rate actor optimizer.  Default: 1e-3.
+        critic_lr: (float, optional) Learning rate critic optimizer.  Default: 1e-3.
+        alpha: (float, optional) Entropy regularization coefficient. (Equivalent to
+            inverse of reward scale in the original SAC paper.)  Default: 0.2.
+        batch_size: (int, optional) Minibatch size for SGD.  Default: 128.
+        start_steps: (int, optional) Number of steps for random action selection
+            before running real policy (helps exploration).  Default: 1000.
+        update_after: (int, optional) Number of env interactions to collect before
+            starting to do gradient descent updates. Ensures replay buffer
+            is full enough for useful updates.  Default: 5000.
+        update_every: (int, optional) Number of env interactions that should elapse
+            between gradient descent updates. Note: Regardless of how long
+            you wait between updates, the ratio of env steps to gradient steps
+            is locked to 1.  Default: 1.
+        max_ep_len: (int, optional) Maximum length of episode.  Defaults to 1000,
+            but *this should be provided for each unique environment!*  This
+            has an effect on how end-of-episode rewards are computed.
+        callbacks: (Iterable[Callable], optional) callback functions to execute
+            at the end of each training epoch.
         """
         self.replay = replay
         if replay is None:
@@ -159,11 +252,10 @@ class SAC:
 
         for step in range(total_steps):
             if step < start_steps:
-                action = torch.as_tensor(self.env.action_space.sample())
+                action = self.env.action_space.sample()
             else:
                 with torch.no_grad():
-                    action, _ = actor(state.unsqueeze(0))
-                    action = torch.as_tensor(action).cpu()[0]
+                    action, _ = actor(state)
 
             next_state, reward, done, _ = self.env.step(action)
             done = False if ep_length == max_ep_len else done
@@ -173,6 +265,8 @@ class SAC:
             ep_length += 1
 
             if step > update_after and step % update_every == 0:
+                epoch = (step + 1) // steps_per_epoch
+                print(f"\rEpoch {epoch} | Avg Reward {self.avg_reward}", end="")
                 for j in range(update_every):
                     self.update(
                         actor,
@@ -184,8 +278,11 @@ class SAC:
                     )
 
             if done or (ep_length == max_ep_len):
-                epoch = (step + 1) // steps_per_epoch
-                print(f"\rEpoch {epoch} | Steps {step + 1} | Reward {ep_reward}", end="")
+                self.ep_rewards.append(ep_reward)
+                if self.avg_reward == 0:
+                    self.avg_reward = ep_reward
+                else:
+                    self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
                 state, ep_reward, ep_length = self.env.reset(), 0, 0
 
             for callback in callbacks:
