@@ -59,7 +59,7 @@ def numpymethod(function: Callable) -> Callable:
                 if isinstance(a, ndarray) else a for a in out
             ]
         else:
-            return out
+            return torch.as_tensor(out)
 
     return new_method
 
