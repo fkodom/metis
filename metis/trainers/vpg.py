@@ -1,3 +1,10 @@
+"""
+metis/trainers/ppo.py
+---------------------
+Proximal Policy Optimization (PPO) algorithm for training RL agents in both
+continuous and discrete action spaces.
+"""
+
 from typing import Iterable, Callable
 
 import gym
@@ -9,11 +16,18 @@ from metis.replay import NoReplay
 from metis import base, utils
 
 
-def actor_loss(
-    batch,
-    actor: base.Actor,
-    gamma: float = 0.99,
-) -> Tensor:
+def actor_loss(batch, actor: base.Actor, gamma: float = 0.99) -> Tensor:
+    """Computes loss for the actor network.
+
+    Parameters
+    ----------
+    actor: (base.Actor) Actor (policy) network to optimize.
+    gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+
+    Returns
+    -------
+    Tensor:  Actor loss
+    """
     states, actions, rewards, dones = batch
     values = utils.discount_values(rewards, dones, gamma)
     values = (values - values.mean()) / values.std()
@@ -23,6 +37,17 @@ def actor_loss(
 
 
 class VPG:
+    """Vanilla Policy Gradients algorithm for training RL agents in both
+    continuous and discrete action spaces.  Paper: *Policy Gradient Methods
+    for Reinforcement Learning with Function Approximation*, Sutton et al, 2000
+
+    The original deep reinforcement learning algorithm, sometimes also known as
+    REINFORCE.  This algorithm is rarely used in production these days, but it
+    has *tremendous* historical and conceptual value.  VPG is very well
+    theoretically supported, and its loss function is fairly simple to derive
+    from first principles.  For that reason, all modern RL algorithms are
+    connected on VPG in their own way (yes, including Q-networks).
+    """
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
@@ -31,18 +56,14 @@ class VPG:
         self.optimizer = None
         self.replay = None
 
-    def update(
-        self,
-        actor,
-        gamma: float = 0.99,
-    ):
-        """Performs PPO update at the end of each epoch using training samples
+    def update(self, actor, gamma: float = 0.99):
+        """Performs PG update at the end of each epoch using training samples
         that have been collected in `self.replay`.
 
         Parameters
         ----------
-        actor
-        gamma: (float) Discount factor. Range: (0, 1)
+        actor: (base.Actor) Actor (policy) network to optimize.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99.
         """
         batch = self.replay.sample()
         self.optimizer.zero_grad()
@@ -56,24 +77,28 @@ class VPG:
         lr: float = 3e-4,
         epochs: int = 200,
         steps_per_epoch: int = 4000,
-        max_episode_len: int = 1000,
+        max_ep_len: int = 1000,
         gamma: float = 0.99,
         callbacks: Iterable[Callable] = (),
     ):
-        """Proximal Policy Optimization (via objective clipping) with early
-        stopping based on approximate KL divergence of the policy network.
+        """Vanilla Policy Gradients algorithm with no added bells or whistles.
 
         Parameters
         ----------
-        actor
-        replay
-        lr: (float) Learning rate for actor optimizer.
-        epochs: (int) Number of training epochs (number of policy updates)
-        steps_per_epoch: (int) Number of environment steps (or turns) per epoch
-        max_episode_len: (int) Max length of an environment episode (or game)
-        gamma: (float) Discount factor. Range: (0, 1)
-        callbacks: (Iterable[Callable]) Collection of callback functions to
-            execute at the end of each training epoch.
+        actor: (base.Actor) Actor (policy) network to optimize.
+        replay: (base.Replay, optional) Experience replay object for sampling
+            previous experiences.  If not provided, defaults to 'ExperienceReplay'
+            with a buffer size of 1,000,000.  Users can provide a replay object,
+            which is pre-populated with experiences (for specific use cases).
+        steps_per_epoch: (int, optional) Number of steps of interaction
+            for the agent and the environment in each epoch.  Default: 4000.
+        epochs: (int, optional) Number of training epochs.  Default:  100.
+        gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
+        max_ep_len: (int, optional) Maximum length of episode.  Defaults to 1000,
+            but *this should be provided for each unique environment!*  This
+            has an effect on how end-of-episode rewards are computed.
+        callbacks: (Iterable[Callable], optional) callback functions to execute
+            at the end of each training epoch.
         """
         self.optimizer = Adam(actor.parameters(), lr=lr)
         self.replay = replay
@@ -93,7 +118,7 @@ class VPG:
                 ep_reward += reward
                 ep_length += 1
 
-                if done or (ep_length == max_episode_len):
+                if done or (ep_length == max_ep_len):
                     self.ep_rewards.append(ep_reward)
                     if self.avg_reward:
                         self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
