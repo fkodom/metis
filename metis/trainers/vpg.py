@@ -1,7 +1,7 @@
 """
-metis/trainers/ppo.py
+metis/trainers/vpg.py
 ---------------------
-Proximal Policy Optimization (PPO) algorithm for training RL agents in both
+Vanilla Policy Gradients (VPG) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
