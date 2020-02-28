@@ -5,7 +5,7 @@ Proximal Policy Optimization (PPO) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
-from typing import Iterable, Callable
+from typing import Iterable, Sequence, Callable
 
 import gym
 import torch
@@ -30,6 +30,7 @@ def actor_loss(
 
     Parameters
     ----------
+    batch: (Sequence[Tensor or Sequence[Tensor]]) Experience sampled for training.
     actor: (base.Actor) Actor (policy) network to optimize.
     critic: (base.Critic) Critic network to optimize.
     gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
@@ -71,11 +72,16 @@ def actor_loss(
     return loss_pi, approx_kl
 
 
-def critic_loss(batch, critic: base.Critic, gamma: float = 0.99) -> Tensor:
+def critic_loss(
+    batch: Sequence[Tensor or Sequence[Tensor]],
+    critic: base.Critic,
+    gamma: float = 0.99,
+) -> Tensor:
     """Computes loss for critic networks.
 
     Parameters
     ----------
+    batch: (Sequence[Tensor or Sequence[Tensor]]) Experience sampled for training.
     critic: (base.Critic) Critic network to optimize.
     gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
 
