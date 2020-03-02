@@ -12,15 +12,15 @@ import torch
 from torch import Tensor
 from torch.optim import Adam
 
-from metis.replay import NoReplay
-from metis.agents import QNetwork
-from metis import base, utils
+from metis.agents import Actor, Critic, QNetwork
+from metis.replay import Replay, NoReplay
+from metis import utils
 
 
 def actor_loss(
     batch: Sequence[Tensor or Sequence[Tensor]],
-    actor: base.Actor,
-    critic: base.Critic,
+    actor: Actor,
+    critic: Critic,
     gamma: float = 0.99,
     lam: float = 0.97,
 ) -> Tensor:
@@ -65,7 +65,7 @@ def actor_loss(
 
 def critic_loss(
     batch: Sequence[Tensor or Sequence[Tensor]],
-    critic: base.Critic,
+    critic: Critic,
     gamma: float = 0.99,
 ) -> Tensor:
     """Computes loss for critic networks.
@@ -108,8 +108,8 @@ class A2C:
 
     def update(
         self,
-        actor: base.Actor,
-        critic: base.Critic,
+        actor: Actor,
+        critic: Critic,
         train_critic_iters: int = 80,
         gamma: float = 0.99,
         lam: float = 0.97,
@@ -141,9 +141,9 @@ class A2C:
 
     def train(
         self,
-        actor: base.Actor,
-        critic: base.Critic,
-        replay: base.Replay = None,
+        actor: Actor,
+        critic: Critic,
+        replay: Replay = None,
         actor_lr: float = 3e-4,
         critic_lr: float = 1e-3,
         train_critic_iters: int = 10,

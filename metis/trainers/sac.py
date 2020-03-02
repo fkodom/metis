@@ -13,15 +13,15 @@ import gym
 import torch
 from torch import Tensor
 
-from metis import base, utils
-from metis.replay import ExperienceReplay
-from metis.agents import QNetwork
+from metis.agents import Actor, Critic, QNetwork
+from metis.replay import Replay, ExperienceReplay
+from metis import utils
 
 
 def actor_loss(
     batch: Sequence[Tensor or Sequence[Tensor]],
-    actor: base.Actor,
-    critics: Iterable[base.Critic],
+    actor: Actor,
+    critics: Iterable[Critic],
     alpha: Union[float, Tensor] = 0.2,
 ) -> (Tensor, Tensor):
     """Computes loss for actor network.
@@ -71,8 +71,8 @@ class SAC:
     def critic_loss(
         self,
         batch: Sequence[Tensor or Sequence[Tensor]],
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
+        actor: Actor,
+        critics: Iterable[Critic],
         gamma: float = 0.99,
         alpha: Union[float, Tensor] = 0.2,
     ) -> Tensor:
@@ -107,8 +107,8 @@ class SAC:
     def q_network_loss(
         self,
         batch: Sequence[Tensor or Sequence[Tensor]],
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
+        actor: Actor,
+        critics: Iterable[Critic],
         gamma: float = 0.99,
         alpha: Union[float, Tensor] = 0.2,
     ) -> Tensor:
@@ -141,8 +141,8 @@ class SAC:
 
     def update(
         self,
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
+        actor: Actor,
+        critics: Iterable[Critic],
         batch_size: int = 128,
         gamma: float = 0.99,
         alpha: Union[float, Tensor] = 0.2,
@@ -183,9 +183,9 @@ class SAC:
 
     def train(
         self,
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
-        replay: base.Replay = None,
+        actor: Actor,
+        critics: Iterable[Critic],
+        replay: Replay = None,
         steps_per_epoch: int = 4000,
         epochs: int = 100,
         gamma: float = 0.99,

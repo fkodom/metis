@@ -11,12 +11,13 @@ import gym
 from torch import Tensor
 from torch.optim import Adam
 
-from metis.replay import NoReplay
-from metis import base, utils
+from metis.agents import Actor
+from metis.replay import Replay, NoReplay
+from metis import utils
 
 
 def actor_loss(
-    batch: Sequence[Tensor or Sequence[Tensor]], actor: base.Actor, gamma: float = 0.99,
+    batch: Sequence[Tensor or Sequence[Tensor]], actor: Actor, gamma: float = 0.99,
 ) -> Tensor:
     """Computes loss for the actor network.
 
@@ -61,7 +62,7 @@ class VPG:
         self.optimizer = None
         self.replay = None
 
-    def update(self, actor: base.Actor, gamma: float = 0.99):
+    def update(self, actor: Actor, gamma: float = 0.99):
         """Performs PG update at the end of each epoch using training samples
         that have been collected in `self.replay`.
 
@@ -79,8 +80,8 @@ class VPG:
 
     def train(
         self,
-        actor: base.Actor,
-        replay: base.Replay = None,
+        actor: Actor,
+        replay: Replay = None,
         lr: float = 3e-4,
         epochs: int = 200,
         steps_per_epoch: int = 4000,

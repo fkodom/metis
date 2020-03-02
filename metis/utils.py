@@ -1,4 +1,5 @@
 from copy import deepcopy
+from time import sleep
 from typing import Callable, Sequence
 import random
 
@@ -9,28 +10,7 @@ import torch
 from torch import Tensor, nn
 from numpy import ndarray
 
-
-def seed(value: int):
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-    random.seed(value)
-    np.random.seed(value)
-    torch.manual_seed(value)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(value)
-
-
-def get_device(obj: Tensor or nn.Module or nn.DataParallel):
-    if isinstance(obj, Tensor):
-        return obj.device
-    elif isinstance(obj, nn.Module):
-        for p in obj.parameters():
-            return p.device
-    elif isinstance(obj, nn.DataParallel):
-        return obj.output_device
-    else:
-        raise TypeError(f"Cannot get device for type {type(obj)}")
+from metis.agents import Actor
 
 
 def numpymethod(function: Callable) -> Callable:
@@ -116,6 +96,49 @@ def torchenv(env: gym.Env):
     return new_env
 
 
+def play(
+    env: gym.Env,
+    actor: Actor,
+    max_turns: int = 1000,
+    frame_rate: float = 9e9,
+    return_frames: bool = False,
+) -> list or None:
+    r"""Plays one game (episode), and visualizes the game environment.
+
+    :param max_turns: Maximum number of turns (or frames) to play in one game
+    :param frame_rate: If render = True, controls the frame rate (in frames/sec) of the episode
+    """
+    env = torchenv(env)
+    state = env.reset()
+    frames = []
+
+    for turn in range(max_turns):
+        sleep(1 / (frame_rate + 1e-6))
+        env.render(mode='human')
+        if return_frames:
+            frames.append(env.render('rgb_array'))
+
+        action = actor.act(state)
+        state, _, done, _ = env.step(action)
+        if done:
+            break
+
+    env.close()
+    if return_frames:
+        return frames
+
+
+def seed(value: int):
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    random.seed(value)
+    np.random.seed(value)
+    torch.manual_seed(value)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(value)
+
+
 @numpymethod
 def discount_values(raw_values, dones, discount):
     def discount_fn(values):
@@ -159,9 +182,13 @@ def compile_tensors(
     return out
 
 
-def mlp(sizes, activation, output_activation=nn.Identity):
-    layers = []
-    for j in range(len(sizes)-1):
-        act = activation if j < len(sizes)-2 else output_activation
-        layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
-    return nn.Sequential(*layers)
+def get_device(obj: Tensor or nn.Module or nn.DataParallel):
+    if isinstance(obj, Tensor):
+        return obj.device
+    elif isinstance(obj, nn.Module):
+        for p in obj.parameters():
+            return p.device
+    elif isinstance(obj, nn.DataParallel):
+        return obj.output_device
+    else:
+        raise TypeError(f"Cannot get device for type {type(obj)}")

@@ -15,11 +15,12 @@ import torch
 from torch import Tensor
 from torch.optim import Adam
 
-from metis import base, utils
-from metis.replay import ExperienceReplay
+from metis.agents import Actor, Critic
+from metis.replay import Replay, ExperienceReplay
+from metis import utils
 
 
-def actor_loss(batch, actor: base.Actor, critics: Iterable[base.Critic]) -> Tensor:
+def actor_loss(batch, actor: Actor, critics: Iterable[Critic]) -> Tensor:
     """Computes loss for actor network.
 
     Parameters
@@ -65,7 +66,7 @@ class TD3:
     def critic_loss(
         self,
         batch,
-        critics: Iterable[base.Critic],
+        critics: Iterable[Critic],
         gamma: float = 0.99,
         target_noise: float = 0.2,
         noise_clip: float = 0.5,
@@ -104,8 +105,8 @@ class TD3:
     def update(
         self,
         iteration: int,
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
+        actor: Actor,
+        critics: Iterable[Critic],
         batch_size: int = 128,
         gamma: float = 0.99,
         target_noise: float = 0.2,
@@ -162,9 +163,9 @@ class TD3:
 
     def train(
         self,
-        actor: base.Actor,
-        critics: Iterable[base.Critic],
-        replay: base.Replay = None,
+        actor: Actor,
+        critics: Iterable[Critic],
+        replay: Replay = None,
         steps_per_epoch: int = 4000,
         epochs: int = 100,
         gamma: float = 0.99,
