@@ -55,7 +55,6 @@ class TD3:
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
-        self.avg_reward = 0.0
 
         self.replay = None
         self.actor_optimizer = None
@@ -95,7 +94,7 @@ class TD3:
             next_action = next_action + noise
 
             next_values = torch.min(*[c(next_states, next_action) for c in self.target_critics])
-            target_values = rewards + gamma * (1 - dones) * next_values
+            target_values = rewards + gamma * (1 - dones.float()) * next_values
 
         values = [c(states, actions) for c in critics]
         return sum((value - target_values).pow(2).mean() for value in values)
@@ -133,7 +132,9 @@ class TD3:
         polyak: (float, optional) Interpolation factor in polyak averaging for
             target networks.  Range: (0, 1).  Default: 0.995
         """
-        batch = self.replay.sample(batch_size)
+        device = utils.get_device(actor)
+        batch = self.replay.sample(batch_size, device=device)
+
         self.critic_optimizer.zero_grad()
         self.critic_loss(
             batch,
@@ -225,6 +226,7 @@ class TD3:
         callbacks: (Iterable[Callable], optional) callback functions to execute
             at the end of each training epoch.
         """
+        device = utils.get_device(actor)
         self.replay = replay
         if replay is None:
             self.replay = ExperienceReplay(int(1e6))
@@ -242,8 +244,7 @@ class TD3:
             if step < start_steps:
                 action = self.env.action_space.sample()
             else:
-                with torch.no_grad():
-                    action, _ = actor(state)
+                action, _ = actor(state.to(device))
                 action += act_noise * torch.randn_like(action)
 
             next_state, reward, done, _ = self.env.step(action)
@@ -254,8 +255,6 @@ class TD3:
             ep_length += 1
 
             if step >= update_after and step % update_every == 0:
-                epoch = (step + 1) // steps_per_epoch
-                print(f"\rEpoch {epoch} | Avg Reward {self.avg_reward}", end="")
                 for iter in range(update_every):
                     self.update(
                         iter,
@@ -269,13 +268,11 @@ class TD3:
                         polyak=polyak,
                     )
 
+                for callback in callbacks:
+                    callback(self)
+
             if done or (ep_length == max_ep_len):
                 self.ep_rewards.append(ep_reward)
-                if self.avg_reward == 0:
-                    self.avg_reward = ep_reward
-                else:
-                    self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
+                epoch = (step + 1) // steps_per_epoch
+                print(f"\rEpoch {epoch} | Step {step} | Reward {ep_reward}", end="")
                 state, ep_reward, ep_length = self.env.reset(), 0, 0
-
-            for callback in callbacks:
-                callback(self)
