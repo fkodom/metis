@@ -30,9 +30,11 @@ def actor_loss(batch, actor: base.Actor, gamma: float = 0.99) -> Tensor:
     Tensor:  Actor loss
     """
     states, actions, rewards, dones = batch
-    values = utils.discount_values(rewards, dones, gamma)
+    values = utils.discount_values(rewards, dones, gamma).to(rewards.device)
     values = (values - values.mean()) / values.std()
     _, logprobs = actor(states, actions)
+    if logprobs.ndim > 1:
+        logprobs = logprobs[range(len(actions)), actions.long()]
 
     return -(logprobs * values).mean()
 
@@ -66,7 +68,9 @@ class VPG:
         actor: (base.Actor) Actor (policy) network to optimize.
         gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99.
         """
-        batch = self.replay.sample()
+        device = utils.get_device(actor)
+        batch = self.replay.sample(device=device)
+
         self.optimizer.zero_grad()
         actor_loss(batch, actor, gamma=gamma).backward()
         self.optimizer.step()
@@ -101,6 +105,7 @@ class VPG:
         callbacks: (Iterable[Callable], optional) callback functions to execute
             at the end of each training epoch.
         """
+        device = utils.get_device(actor)
         self.optimizer = Adam(actor.parameters(), lr=lr)
         self.replay = replay
         if self.replay is None:
@@ -109,10 +114,10 @@ class VPG:
         for epoch in range(1, epochs + 1):
             state = self.env.reset()
             ep_reward, ep_length = 0, 0
+            num_episodes = 0
 
             for t in range(1, steps_per_epoch + 1):
-                with torch.no_grad():
-                    action, _ = actor(state)
+                action, _ = actor(state.to(device))
 
                 state, reward, done, _ = self.env.step(action)
                 self.replay.append([state, action, reward, done])
@@ -120,15 +125,14 @@ class VPG:
                 ep_length += 1
 
                 if done or (ep_length == max_ep_len):
+                    num_episodes += 1
                     self.ep_rewards.append(ep_reward)
-                    if self.avg_reward:
-                        self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
-                    else:
-                        self.avg_reward = ep_reward
                     state = self.env.reset()
                     ep_reward, ep_length = 0, 0
 
             self.update(actor, gamma=gamma)
-            print(f"\r Epoch {epoch}, Avg Reward {self.avg_reward}", end="")
+            avg_reward = sum(self.ep_rewards[-num_episodes:]) / num_episodes
+            print(f"\rEpoch {epoch} | Avg Reward {avg_reward}", end="")
+
             for callback in callbacks:
                 callback(self)

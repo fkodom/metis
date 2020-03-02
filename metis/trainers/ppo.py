@@ -58,7 +58,7 @@ def actor_loss(
     # GAE-Lambda advantages
     deltas = rewards + gamma * next_vals - vals
     deltas = torch.where(dones > 1e-6, rewards, deltas)
-    adv = utils.discount_values(deltas, dones, gamma * lam)
+    adv = utils.discount_values(deltas, dones, gamma * lam).to(deltas.device)
     adv = (adv - adv.mean()) / adv.std()
 
     _, logp = actor(states, actions)
@@ -119,7 +119,6 @@ class PPO:
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
-        self.avg_reward = 0.0
 
         self.actor_optimizer = None
         self.critic_optimizer = None
@@ -157,7 +156,8 @@ class PPO:
             policies after an update. Used for early stopping. Typically in
             range (0.01, 0.05).  Default: 0.01.
         """
-        batch = self.replay.sample()
+        device = utils.get_device(actor)
+        batch = self.replay.sample(device=device)
 
         for i in range(train_actor_iters):
             self.actor_optimizer.zero_grad()
@@ -227,6 +227,7 @@ class PPO:
         callbacks: (Iterable[Callable], optional) callback functions to execute
             at the end of each training epoch.
         """
+        device = utils.get_device(actor)
         self.actor_optimizer = Adam(actor.parameters(), lr=actor_lr)
         self.critic_optimizer = Adam(critic.parameters(), lr=critic_lr)
         self.replay = replay
@@ -236,10 +237,10 @@ class PPO:
         for epoch in range(1, epochs + 1):
             state = self.env.reset()
             ep_reward, ep_length = 0, 0
+            num_episodes = 0
 
             for t in range(1, steps_per_epoch + 1):
-                with torch.no_grad():
-                    action, logprob = actor(state)
+                action, logprob = actor(state.to(device))
 
                 next_state, reward, done, _ = self.env.step(action)
                 done = False if ep_length == max_ep_len else done
@@ -249,11 +250,8 @@ class PPO:
                 ep_length += 1
 
                 if done or (ep_length == max_ep_len):
+                    num_episodes += 1
                     self.ep_rewards.append(ep_reward)
-                    if self.avg_reward:
-                        self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
-                    else:
-                        self.avg_reward = ep_reward
                     state = self.env.reset()
                     ep_reward, ep_length = 0, 0
 
@@ -268,7 +266,8 @@ class PPO:
                 target_kl=target_kl,
             )
 
-            print(f"\r Epoch {epoch} | Avg Reward {self.avg_reward}", end="")
+            avg_reward = sum(self.ep_rewards[-num_episodes:]) / num_episodes
+            print(f"\rEpoch {epoch} | Avg Reward {avg_reward}", end="")
 
             for callback in callbacks:
                 callback(self)
