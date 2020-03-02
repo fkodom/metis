@@ -5,10 +5,9 @@ Vanilla Policy Gradients (VPG) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
-from typing import Iterable, Callable
+from typing import Iterable, Sequence, Callable
 
 import gym
-import torch
 from torch import Tensor
 from torch.optim import Adam
 
@@ -16,7 +15,9 @@ from metis.replay import NoReplay
 from metis import base, utils
 
 
-def actor_loss(batch, actor: base.Actor, gamma: float = 0.99) -> Tensor:
+def actor_loss(
+    batch: Sequence[Tensor or Sequence[Tensor]], actor: base.Actor, gamma: float = 0.99,
+) -> Tensor:
     """Computes loss for the actor network.
 
     Parameters
@@ -51,6 +52,7 @@ class VPG:
     from first principles.  For that reason, all modern RL algorithms are
     connected on VPG in their own way (yes, including Q-networks).
     """
+
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
@@ -59,7 +61,7 @@ class VPG:
         self.optimizer = None
         self.replay = None
 
-    def update(self, actor, gamma: float = 0.99):
+    def update(self, actor: base.Actor, gamma: float = 0.99):
         """Performs PG update at the end of each epoch using training samples
         that have been collected in `self.replay`.
 

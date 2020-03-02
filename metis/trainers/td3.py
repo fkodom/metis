@@ -93,7 +93,9 @@ class TD3:
             noise = torch.clamp(noise, -noise_clip, noise_clip)
             next_action = next_action + noise
 
-            next_values = torch.min(*[c(next_states, next_action) for c in self.target_critics])
+            next_values = torch.min(
+                *[c(next_states, next_action) for c in self.target_critics]
+            )
             target_values = rewards + gamma * (1 - dones.float()) * next_values
 
         values = [c(states, actions) for c in critics]

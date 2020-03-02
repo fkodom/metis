@@ -95,7 +95,9 @@ class SAC:
 
         with torch.no_grad():
             next_actions, next_logprobs = actor(next_states)
-            next_values = torch.min(*[c(next_states, next_actions) for c in self.target_critics])
+            next_values = torch.min(
+                *[c(next_states, next_actions) for c in self.target_critics]
+            )
             backup = next_values - alpha * next_logprobs.view(-1, 1)
             target_values = rewards + (1.0 - dones.float()) * gamma * backup
 
@@ -283,4 +285,3 @@ class SAC:
                 epoch = (step + 1) // steps_per_epoch
                 print(f"\rEpoch {epoch} | Step {step} | Reward {ep_reward}", end="")
                 state, ep_reward, ep_length = self.env.reset(), 0, 0
-

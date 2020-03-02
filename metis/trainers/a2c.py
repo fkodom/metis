@@ -5,7 +5,7 @@ Advantage Actor-Critic (A2C) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
-from typing import Iterable, Callable
+from typing import Iterable, Sequence, Callable
 
 import gym
 import torch
@@ -18,7 +18,7 @@ from metis import base, utils
 
 
 def actor_loss(
-    batch,
+    batch: Sequence[Tensor or Sequence[Tensor]],
     actor: base.Actor,
     critic: base.Critic,
     gamma: float = 0.99,
@@ -63,7 +63,11 @@ def actor_loss(
     return -(logprobs * advantages).mean()
 
 
-def critic_loss(batch, critic: base.Critic, gamma: float = 0.99) -> Tensor:
+def critic_loss(
+    batch: Sequence[Tensor or Sequence[Tensor]],
+    critic: base.Critic,
+    gamma: float = 0.99,
+) -> Tensor:
     """Computes loss for critic networks.
 
     Parameters
@@ -93,6 +97,7 @@ class A2C:
 
     TODO: Add algorithm summary/description
     """
+
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
@@ -103,8 +108,8 @@ class A2C:
 
     def update(
         self,
-        actor,
-        critic,
+        actor: base.Actor,
+        critic: base.Critic,
         train_critic_iters: int = 80,
         gamma: float = 0.99,
         lam: float = 0.97,

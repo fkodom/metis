@@ -18,7 +18,7 @@ from metis.agents import QNetwork
 
 
 def actor_loss(
-    batch,
+    batch: Sequence[Tensor or Sequence[Tensor]],
     actor: base.Actor,
     critic: base.Critic,
     clip_ratio: float = 0.2,
