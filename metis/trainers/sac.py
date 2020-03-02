@@ -98,7 +98,7 @@ class SAC:
             next_actions, next_logprobs = actor(next_states)
             next_values = torch.min(*[c(next_states, next_actions) for c in self.target_critics])
             backup = next_values - alpha * next_logprobs.view(-1, 1)
-            target_values = rewards + (1.0 - dones) * gamma * backup
+            target_values = rewards + (1.0 - dones.float()) * gamma * backup
 
         values = [c(states, actions) for c in critics]
         return sum((value - target_values).pow(2).mean() for value in values)
@@ -133,7 +133,7 @@ class SAC:
             next_actions, next_logprobs = actor(next_states)
             next_values = torch.min(*[c(next_states) for c in self.target_critics])
             backup = (next_values - alpha * next_logprobs).mean(-1)
-            target_values = rewards + (1.0 - dones) * gamma * backup
+            target_values = rewards + (1.0 - dones.float()) * gamma * backup
 
         values = [c(states)[range(len(actions)), actions.long()] for c in critics]
         return sum((value - target_values).pow(2).mean() for value in values)
@@ -162,7 +162,8 @@ class SAC:
             inverse of reward scale in the original SAC paper.)  Default: 0.2.
         batch_size: (int, optional) Minibatch size for SGD.  Default: 128.
         """
-        batch = self.replay.sample(batch_size)
+        device = utils.get_device(actor)
+        batch = self.replay.sample(batch_size, device=device)
 
         self.critic_optimizer.zero_grad()
         if any(isinstance(c, QNetwork) for c in critics):
@@ -237,6 +238,7 @@ class SAC:
         callbacks: (Iterable[Callable], optional) callback functions to execute
             at the end of each training epoch.
         """
+        device = utils.get_device(actor)
         self.replay = replay
         if replay is None:
             self.replay = ExperienceReplay(int(1e6))
@@ -250,12 +252,11 @@ class SAC:
         ep_reward, ep_length = 0, 0
         total_steps = steps_per_epoch * epochs
 
-        for step in range(total_steps):
+        for step in range(1, total_steps + 1):
             if step < start_steps:
                 action = self.env.action_space.sample()
             else:
-                with torch.no_grad():
-                    action, _ = actor(state)
+                action, _ = actor(state.to(device))
 
             next_state, reward, done, _ = self.env.step(action)
             done = False if ep_length == max_ep_len else done
@@ -265,8 +266,6 @@ class SAC:
             ep_length += 1
 
             if step > update_after and step % update_every == 0:
-                epoch = (step + 1) // steps_per_epoch
-                print(f"\rEpoch {epoch} | Avg Reward {self.avg_reward}", end="")
                 for j in range(update_every):
                     self.update(
                         actor,
@@ -277,13 +276,17 @@ class SAC:
                         polyak=polyak,
                     )
 
+                for callback in callbacks:
+                    callback(self)
+
             if done or (ep_length == max_ep_len):
                 self.ep_rewards.append(ep_reward)
                 if self.avg_reward == 0:
                     self.avg_reward = ep_reward
                 else:
-                    self.avg_reward = 0.9 * self.avg_reward + 0.1 * ep_reward
+                    self.avg_reward = 0.8 * self.avg_reward + 0.2 * ep_reward
+
+                epoch = (step + 1) // steps_per_epoch
+                print(f"\rEpoch {epoch} | Step {step} | Reward {ep_reward}", end="")
                 state, ep_reward, ep_length = self.env.reset(), 0, 0
 
-            for callback in callbacks:
-                callback(self)
