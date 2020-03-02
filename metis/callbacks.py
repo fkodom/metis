@@ -4,21 +4,43 @@ callbacks.py
 Callbacks for use during model training
 """
 
-from typing import AnyStr, Callable
-
 import torch
+from torch import nn
 
 
-def checkpoint(module: torch.nn.Module, save_path: AnyStr) -> Callable:
-    """Defines a callback for saving PyTorch models during training.  The callback function will always accept `self`
-    as the first argument.  We include `*args` positional arguments for added flexibility, so that a network could
-    pass multiple arguments (e.g. training/validation loss, epoch number, etc.) without breaking it.
-
-    :param save_path:  Absolute path to the model's save file
-    :return:  Callback function for model saving
+class ModelCheckpoint:
+    """Saves the entire model using 'pickle'.  'StateDictCheckpoint' is preferred
+    whenever possible, because this creates issues whenever source files change.
+    But it's still useful in many scenarios, so we include it here.
     """
-    # noinspection PyUnusedLocal
-    def callback(*args, **kwargs):
-        torch.save(module.state_dict(), save_path)
+    def __init__(self, model: nn.Module, path: str, frequency: int = 1):
+        self.model = model
+        self.path = path
+        self.frequency = frequency
 
-    return callback
+        self.counter = 0
+
+    def __call__(self):
+        self.counter += 1
+        if self.counter % self.frequency == 0:
+            torch.save(self.model, self.path)
+
+
+class StateDictCheckpoint:
+    """Saves the model's state dictionary using 'pickle'.  NOTE: This does not
+    implicitly save any of the model source code, as with 'ModelCheckpoint'.
+    The resulting state dictionary is much easier to use across projects/libraries.
+    However, it requires users to manually ensure that the underlying source code
+    does not change.
+    """
+    def __init__(self, module: nn.Module, path: str, frequency: int = 1):
+        self.module = module
+        self.path = path
+        self.frequency = frequency
+
+        self.counter = 0
+
+    def __call__(self):
+        self.counter += 1
+        if self.counter % self.frequency == 0:
+            torch.save(self.module.state_dict(destination="cpu"), self.path)
