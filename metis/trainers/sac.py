@@ -62,7 +62,6 @@ class SAC:
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
         self.ep_rewards = []
-        self.avg_reward = 0.0
 
         self.replay = None
         self.critic_optimizer = None
@@ -281,11 +280,6 @@ class SAC:
 
             if done or (ep_length == max_ep_len):
                 self.ep_rewards.append(ep_reward)
-                if self.avg_reward == 0:
-                    self.avg_reward = ep_reward
-                else:
-                    self.avg_reward = 0.8 * self.avg_reward + 0.2 * ep_reward
-
                 epoch = (step + 1) // steps_per_epoch
                 print(f"\rEpoch {epoch} | Step {step} | Reward {ep_reward}", end="")
                 state, ep_reward, ep_length = self.env.reset(), 0, 0
