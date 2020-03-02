@@ -21,6 +21,18 @@ def seed(value: int):
         torch.cuda.manual_seed_all(value)
 
 
+def get_device(obj: Tensor or nn.Module or nn.DataParallel):
+    if isinstance(obj, Tensor):
+        return obj.device
+    elif isinstance(obj, nn.Module):
+        for p in obj.parameters():
+            return p.device
+    elif isinstance(obj, nn.DataParallel):
+        return obj.output_device
+    else:
+        raise TypeError(f"Cannot get device for type {type(obj)}")
+
+
 def numpymethod(function: Callable) -> Callable:
     """Decorator function, which automatically casts any `np.ndarray` input
     arguments (or keyword arguments) to `torch.Tensor`.  If *any* numpy arrays
@@ -125,7 +137,10 @@ def discount_values(raw_values, dones, discount):
     return np.ascontiguousarray(values)
 
 
-def compile_tensors(inputs: Sequence[Tensor or Sequence[Tensor]]) -> Tensor or Sequence[Tensor]:
+def compile_tensors(
+    inputs: Sequence[Tensor or Sequence[Tensor]],
+    device: torch.device = None,
+) -> Tensor or Sequence[Tensor]:
     if isinstance(inputs, Tensor):
         out = inputs
     elif isinstance(inputs[0], Tensor):
@@ -137,6 +152,9 @@ def compile_tensors(inputs: Sequence[Tensor or Sequence[Tensor]]) -> Tensor or S
         )
     else:
         out = torch.tensor(inputs, dtype=torch.float)
+
+    if device is not None:
+        out = out.to(device)
 
     return out
 

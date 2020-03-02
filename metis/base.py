@@ -3,6 +3,7 @@ from typing import Sequence
 from time import sleep
 
 import gym
+import torch
 from torch import nn, Tensor
 
 from metis import utils
@@ -50,17 +51,18 @@ class Replay(ABC):
         return self.buffer.__getitem__(item)
 
     @staticmethod
-    def _compile(samples: Sequence[Observation]):
+    def _compile(samples: Sequence[Observation], device: torch.device = None):
         nitems = len(samples[0])
         return tuple(
-            utils.compile_tensors([s[i] for s in samples]) for i in range(nitems)
+            utils.compile_tensors([s[i] for s in samples], device=device)
+            for i in range(nitems)
         )
 
     def append(self, observation: Observation):
-        self.buffer.append(observation)
+        self.buffer.append([torch.as_tensor(x).detach().cpu() for x in observation])
 
     @abstractmethod
-    def sample(self, *args, **kwargs) -> Batch:
+    def sample(self, *args, device: torch.device = None, **kwargs) -> Batch:
         """"""
 
 
