@@ -1,10 +1,10 @@
 # Metis
 
-![metis-symbol](https://raw.githubusercontent.com/fkodom/metis/master/docs/media/metis.jpg)
-
 Metis is a minimalist library for training RL agents in PyTorch.  It implements 
 many common training algorithms, with a focus on actor-critic methods. 
 Includes SAC, TD3, PPO, A2C, VPG.
+
+![metis-symbol](https://raw.githubusercontent.com/fkodom/metis/master/docs/media/metis.jpg)
 
 
 ### Why the name 'metis'?
