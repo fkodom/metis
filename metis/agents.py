@@ -94,7 +94,7 @@ class CategoricalActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = torch.tanh,
+        activation: Callable = nn.Tanh(),
     ):
         """
         Parameters
@@ -130,7 +130,7 @@ class GaussianActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = torch.tanh,
+        activation: Callable = nn.Tanh(),
         output_activation: Callable = nn.Identity(),
         action_limit: float = 1.0,
     ):
@@ -183,7 +183,7 @@ class DeterministicGaussianActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = torch.tanh,
+        activation: Callable = nn.Tanh(),
         output_activation: Callable = nn.Identity(),
         action_limit: float = 1.0,
     ):
@@ -246,7 +246,7 @@ class SquashedGaussianActor(Actor):
         """
         super().__init__()
         self.action_limit = action_limit
-        self.mu = mlp([state_dim, *hidden_sizes, action_dim], torch.relu)
+        self.mu = mlp([state_dim, *hidden_sizes, action_dim], nn.ReLU())
         self.log_sigma = torch.nn.Parameter(
             -0.5 * torch.ones(action_dim, dtype=torch.float), requires_grad=True
         )
@@ -307,7 +307,7 @@ class GaussianCritic(Critic):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = torch.tanh,
+        activation: Callable = nn.Tanh(),
     ):
         """
         Parameters
@@ -345,7 +345,7 @@ class QNetwork(Critic):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = torch.tanh,
+        activation: Callable = nn.Tanh(),
     ):
         """
         Parameters
@@ -370,7 +370,7 @@ class QNetwork(Critic):
 def actor(
     env: gym.Env,
     hidden_sizes: Sequence[int] = (64, 64),
-    activation: Callable = torch.relu,
+    activation: Callable = nn.ReLU(),
     output_activation: Callable = nn.Identity(),
     action_limit: float = 1.0,
     deterministic: bool = False,
@@ -438,7 +438,7 @@ def actor(
 def critic(
     env: gym.Env,
     hidden_sizes: Sequence[int] = (64, 64),
-    activation: Callable = torch.tanh,
+    activation: Callable = nn.Tanh(),
 ) -> Critic:
     """Automatically generates a critic network for the given environment.
 
