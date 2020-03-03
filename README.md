@@ -10,14 +10,9 @@ Includes SAC, TD3, PPO, A2C, VPG.
 ### Why the name 'metis'?
 
 The meaning is three-fold: 
-1. The Greek word *metis* meant a quality that combined wisdom and cunning.  
-   Metis feels like an apt description for the goal of RL -- find a cunning way 
-   to gain wisdom about a particular environment.
-2. *Metis* was also a Titaness of Greek mythology, known as the embodiment of
-   "prudence", "wisdom", or "wise counsel".  Again, sounds like a good description
-   for what RL aspires to be.
-3. "Metis" sounds vaguely similar to "meta", as in meta-learning.  For those out
-   there (which definitely includes myself) who need something simpler to remember.
+1. The Greek word *metis* meant a quality that combined wisdom and cunning.  Metis feels like an apt description for the goal of RL -- find a cunning way to gain wisdom about a particular environment.
+2. *Metis* was also a Titaness of Greek mythology, known as the embodiment of "prudence", "wisdom", or "wise counsel".  Again, sounds like a good description for what RL aspires to be.
+3. "Metis" sounds vaguely similar to "meta", as in meta-learning.  For those out there (which definitely includes myself) who need something simpler to remember.
 
 
 ### Philosophy
