@@ -47,7 +47,7 @@ class Replay(ABC):
             incrementally removed from the buffer.
         """
         self.maxsize = int(maxsize)
-        self.buffer = []
+        self.buffer: list = []
 
     def __repr__(self):
         return f"{self.__class__.__name__}(maxsize={self.maxsize})"
@@ -92,7 +92,7 @@ class Replay(ABC):
         """
         self.buffer.append([torch.as_tensor(x).detach().cpu() for x in observation])
         if len(self.buffer) > self.maxsize:
-            self.buffer = self.buffer[-self.maxsize:]
+            self.buffer.pop(0)
 
     @abstractmethod
     def sample(self, *args, device: torch.device = None, **kwargs) -> Batch:
