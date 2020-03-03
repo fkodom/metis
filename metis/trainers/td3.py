@@ -243,7 +243,7 @@ class TD3:
         total_steps = steps_per_epoch * epochs
         state, ep_reward, ep_length = self.env.reset(), 0, 0
 
-        for step in range(total_steps):
+        for step in range(1, total_steps + 1):
             if step < start_steps:
                 action = self.env.action_space.sample()
             else:
