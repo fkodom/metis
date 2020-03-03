@@ -1,3 +1,9 @@
+"""
+metis/utils.py
+--------------
+Utility functions for training and visualizing RL agents in PyTorch.
+"""
+
 from copy import deepcopy
 from time import sleep
 from typing import Callable, Sequence
