@@ -13,7 +13,7 @@ import gym
 import torch
 from torch import Tensor
 
-from metis.agents import Actor, Critic, QNetwork
+from metis.agents import Actor, Critic, DQNCritic
 from metis.replay import Replay, ExperienceReplay
 from metis import utils
 
@@ -39,7 +39,7 @@ def actor_loss(
     """
     states = batch[0]
     actions, logprobs = actor(states)
-    if any(isinstance(c, QNetwork) for c in critics):
+    if any(isinstance(c, DQNCritic) for c in critics):
         values = torch.min(*[c(states) for c in critics])
         return (logprobs.exp() * (alpha * logprobs - values)).mean()
     else:
@@ -167,7 +167,7 @@ class SAC:
         batch = self.replay.sample(batch_size, device=device)
 
         self.critic_optimizer.zero_grad()
-        if any(isinstance(c, QNetwork) for c in critics):
+        if any(isinstance(c, DQNCritic) for c in critics):
             self.q_network_loss(batch, actor, critics, alpha=alpha).backward()
         else:
             self.critic_loss(batch, actor, critics, gamma=gamma, alpha=alpha).backward()

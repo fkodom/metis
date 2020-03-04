@@ -12,7 +12,7 @@ import torch
 from torch import Tensor
 from torch.optim import Adam
 
-from metis.agents import Actor, Critic, QNetwork
+from metis.agents import Actor, Critic, DQNCritic
 from metis.replay import Replay, NoReplay
 from metis import utils
 
@@ -46,7 +46,7 @@ def actor_loss(
     """
     states, actions, old_logprobs, rewards, dones, next_states = batch
     with torch.no_grad():
-        if isinstance(critic, QNetwork):
+        if isinstance(critic, DQNCritic):
             vals = critic(states)[range(len(actions)), actions.long()]
             next_act = actor(next_states)[0]
             next_vals = critic(next_states)[range(len(next_act)), next_act.long()]
@@ -93,7 +93,7 @@ def critic_loss(
     returns = torch.zeros_like(rewards)
     returns[:-1] = utils.discount_values(rewards, dones, gamma)[:-1]
 
-    if isinstance(critic, QNetwork):
+    if isinstance(critic, DQNCritic):
         values = critic(states)[range(len(actions)), actions.long()]
         return (values - returns.unsqueeze(1)).pow(2).mean()
     else:

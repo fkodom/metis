@@ -268,6 +268,45 @@ class SquashedGaussianActor(Actor):
         return action, logprob
 
 
+class DQN(Actor):
+    """Deep-Q Network (DQN), which is used as an actor in discrete action spaces.
+    Does not need to know the chosen action, but returns an expected value for
+    each possible state-action pair.
+
+    TODO: Finish docstring
+
+    # NOTE:
+    #     * In practice, this is typically easier to train than Critic networks (in
+    #       the traditional actor-critic sense, where the critic receives the chosen
+    #       action as input), because actions are just sparse, one-hot vectors.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        hidden_sizes: Sequence[int] = (64, 64),
+        activation: Callable = nn.Tanh(),
+    ):
+        """
+        Parameters
+        ----------
+        state_dim: (int) Size of the state space
+        action_dim: (int) Size of the action space
+        hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
+            The first value should be the size of the input array.
+        activation: (Callable) Activation function applied to the output of
+            each layer
+        """
+        super().__init__()
+        self.value = mlp([state_dim, *hidden_sizes, action_dim], activation)
+
+    def forward(self, state: State, action: Action = None) -> (Action, Value):
+        values = self.value(state)
+        actions = values.argmax(-1)
+        return actions, values
+
+
 # ----------------------- Standardized *CRITIC* Modules -----------------------
 
 
@@ -329,7 +368,7 @@ class GaussianCritic(Critic):
         return self.value(inputs).squeeze(-1)
 
 
-class QNetwork(Critic):
+class DQNCritic(Critic):
     """Critic network for discrete action spaces (also known as a Q-Network).
     Does not need to know the chosen action, but returns an expected value for
     each possible state-action pair.
@@ -460,4 +499,4 @@ def critic(
             state_space.shape[0], action_space.shape[0], hidden_sizes, activation
         )
     else:
-        return QNetwork(state_space.shape[0], action_space.n, hidden_sizes, activation)
+        return DQNCritic(state_space.shape[0], action_space.n, hidden_sizes, activation)
