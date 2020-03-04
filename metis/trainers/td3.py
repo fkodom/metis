@@ -6,7 +6,7 @@ agents in continuous action spaces.  Requires the actor network to have a
 *deterministic* policy (i.e. no random sampling -- predicts the expected value).
 """
 
-from typing import Iterable, Callable
+from typing import Iterable, Sequence, Callable
 from copy import deepcopy
 from itertools import chain
 
@@ -20,7 +20,9 @@ from metis.replay import Replay, ExperienceReplay
 from metis import utils
 
 
-def actor_loss(batch, actor: Actor, critics: Iterable[Critic]) -> Tensor:
+def actor_loss(
+    batch: Sequence[Tensor or Sequence[Tensor]], actor: Actor, critics: Iterable[Critic]
+) -> Tensor:
     """Computes loss for actor network.
 
     Parameters
@@ -65,7 +67,7 @@ class TD3:
 
     def critic_loss(
         self,
-        batch,
+        batch: Sequence[Tensor or Sequence[Tensor]],
         critics: Iterable[Critic],
         gamma: float = 0.99,
         target_noise: float = 0.2,
