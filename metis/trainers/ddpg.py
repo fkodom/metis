@@ -1,12 +1,12 @@
 """
-metis/trainers/td3.py
+metis/trainers/ddpg.py
 ---------------------
 Deep Deterministic Policy Gradients (DDPG) algorithm for training RL agents in
 continuous action spaces.  Requires the actor network to have a *deterministic*
 policy (i.e. no random sampling -- predicts the expected value).
 """
 
-from typing import Iterable, Callable
+from typing import Iterable, Sequence, Callable
 from copy import deepcopy
 
 import gym
@@ -19,7 +19,9 @@ from metis.replay import Replay, ExperienceReplay
 from metis import utils
 
 
-def actor_loss(batch, actor: Actor, critic: Critic) -> Tensor:
+def actor_loss(
+    batch: Sequence[Tensor or Sequence[Tensor]], actor: Actor, critic: Critic
+) -> Tensor:
     """Computes loss for actor network.
 
     Parameters
@@ -37,7 +39,29 @@ def actor_loss(batch, actor: Actor, critic: Critic) -> Tensor:
 
 
 class DDPG:
-    """TODO: Docstring"""
+    """Deep Deterministic Policy Gradients (DDPG) algorithm for training RL
+    agents in continuous action spaces.  Requires the actor network to have a
+    *deterministic* policy (i.e. no random sampling -- predicts the expected
+    value).  (arxiv:1509.02971v6 [cs.LG])
+
+    DDPG was a landmark paper in reinforcement learning for continuous action
+    spaces.  It was the first to introduce *target networks* for actor-critic
+    methods, which were modeled after contemporary advances in Deep-Q Networks
+    (DQNs). DDPG is very sample efficient, compared to other actor-critic
+    algorithms like A3C or PPO, because it repeatedly samples from past
+    experiences using an Experience Replay.  The actor network uses a
+    *deterministic* policy, where the action uncertainty is artificially added
+    from a Gaussian distribution during training.  This explicit randomness can
+    be helpful for early exploration, but convergence is trickier than in other
+    actor-critic algorithms, such as SAC or PPO.
+
+    **NOTE:**
+    DDPG is no longer the state-of-the-art for learning in continuous action
+    spaces -- it has been surpassed by SAC and TD3 (it's direct successor).
+    Although DDPG achieved nice sample efficiency, it is known to be highly
+    sensitive to hyperparameters.  SAC and TD3 both improve upon the ideas from
+    DDPG, and they are much more robust.
+    """
 
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
@@ -51,11 +75,11 @@ class DDPG:
 
     def critic_loss(
         self,
-        batch,
+        batch: Sequence[Tensor or Sequence[Tensor]],
         critic: Critic,
         gamma: float = 0.99,
     ) -> Tensor:
-        """Computes loss for critic networks.
+        """Computes loss for critic network.
 
         Parameters
         ----------
@@ -100,11 +124,7 @@ class DDPG:
         batch = self.replay.sample(batch_size, device=device)
 
         self.critic_optimizer.zero_grad()
-        self.critic_loss(
-            batch,
-            critic,
-            gamma=gamma,
-        ).backward()
+        self.critic_loss(batch, critic, gamma=gamma,).backward()
         self.critic_optimizer.step()
 
         self.actor_optimizer.zero_grad()
