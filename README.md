@@ -122,7 +122,7 @@ callbacks.
 (e.g. `spinup`) define VPG using both an actor and critic network, which is 
 equivalent to A2C in this repository.  Our VPG does *not* contain a critic 
 network, since this aligns more closely with the original 
-[REINFORCE paper](https://papers.nips.cc/paper/1713-policy-gradient-methods-for-reinforcement-learning-with-function-approximation.pdf).
+[REINFORCE paper](https://papers.nips.cc/paper/1713-policy-gradient-methods-for-reinforcement-learning-with-function-approximation.pdf').
 
 
 ## Future Work
