@@ -172,7 +172,7 @@ class TD3:
         epochs: int = 100,
         gamma: float = 0.99,
         polyak: float = 0.995,
-        actor_lr: float = 1e-3,
+        actor_lr: float = 5e-4,
         critic_lr: float = 1e-3,
         batch_size: int = 128,
         start_steps: int = 5000,
@@ -273,6 +273,7 @@ class TD3:
                         polyak=polyak,
                     )
 
+            if step % steps_per_epoch == 0:
                 for callback in callbacks:
                     callback(self)
 

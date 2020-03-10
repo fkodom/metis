@@ -190,7 +190,7 @@ class SAC:
         epochs: int = 100,
         gamma: float = 0.99,
         polyak: float = 0.995,
-        actor_lr: float = 1e-3,
+        actor_lr: float = 5e-4,
         critic_lr: float = 1e-3,
         alpha: float = 0.2,
         batch_size: int = 128,
@@ -277,6 +277,7 @@ class SAC:
                         polyak=polyak,
                     )
 
+            if step % steps_per_epoch == 0:
                 for callback in callbacks:
                     callback(self)
 
