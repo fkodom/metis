@@ -12,6 +12,7 @@ import random
 import gym
 import torch
 from torch import Tensor, nn
+import torch.nn.functional as f
 import numpy as np
 from scipy.signal import lfilter
 from numpy import ndarray
@@ -172,6 +173,7 @@ def play(
         Otherwise, returns None.
     """
     env = torchenv(env)
+    device = get_device(actor)
     state = env.reset()
     frames = []
 
@@ -181,7 +183,7 @@ def play(
         if return_frames:
             frames.append(env.render('rgb_array'))
 
-        action = actor.act(state)
+        action, _ = actor(state.to(device))
         state, _, done, _ = env.step(action)
         if done:
             break
@@ -248,6 +250,29 @@ def discount_values(raw_values: ndarray, dones: ndarray, discount: float) -> nda
     values[idx:] = discount_fn(raw_values[idx:])
 
     return np.ascontiguousarray(values)
+
+
+def smooth_values(raw_values: Tensor, window: int = 10) -> Tensor:
+    """Function for smoothing values (typically for rewards when benchmarking
+    various training algorithms).
+
+    Parameters
+    ----------
+    raw_values: (Tensor) Raw values to smooth
+
+    Returns
+    -------
+    Tensor: Smoothed values
+    """
+    shape = raw_values.shape
+    raw_values = raw_values.float().view(-1, 1, raw_values.shape[-1])
+
+    kernel = torch.ones(1, 1, window, device=raw_values.device)
+    padding = window - 1
+    num_values = f.conv1d(torch.ones_like(raw_values), kernel, padding=padding)
+    values = f.conv1d(raw_values, kernel, padding=padding) / num_values
+
+    return values[..., :-padding].view(shape)
 
 
 def compile_tensors(
