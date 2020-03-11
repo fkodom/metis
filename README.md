@@ -1,4 +1,6 @@
-![metis-symbol](https://upload.wikimedia.org/wikipedia/commons/d/dc/9_Metis_symbol.svg)
+<div align="center">
+    <img width="525" height="425" src="https://upload.wikimedia.org/wikipedia/commons/d/dc/9_Metis_symbol.svg">
+</div>
 
 # Metis
 
