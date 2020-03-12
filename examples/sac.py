@@ -5,7 +5,7 @@ from metis import agents, play
 from metis.trainers import SAC
 
 
-env = gym.make("Pendulum-v0")
+env = gym.make("CartPole-v1")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 actor = agents.actor(env, hidden_sizes=(256, 256), squashed=True).to(device)
