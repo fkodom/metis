@@ -500,3 +500,31 @@ def critic(
         )
     else:
         return DQNCritic(state_space.shape[0], action_space.n, hidden_sizes, activation)
+
+
+def dqn(
+    env: gym.Env,
+    hidden_sizes: Sequence[int] = (64, 64),
+    activation: Callable = nn.ReLU(),
+) -> Actor:
+    """Automatically generates an actor network for the given environment.
+
+    Parameters
+    ----------
+    env: (gym.Env) Gym environment the actor will interact with
+    hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.  The
+        first value should be the size of the input array.
+    activation: (Callable) Activation function applied to the output of each layer
+
+    Returns
+    -------
+    nn.Module: Actor network
+    """
+    state_space = env.observation_space
+    action_space = env.action_space
+    return DQN(
+        state_space.shape[0],
+        action_space.n,
+        hidden_sizes=hidden_sizes,
+        activation=activation,
+    )
