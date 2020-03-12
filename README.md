@@ -84,7 +84,7 @@ trainer.train(actor, critic)
 
 Training on multiple GPUs is only slightly more work.  We use `DataParallel`
 from the PyTorch API to specify which devices to run on.  Again, there are no 
-changes needed for the trainer object.
+changes needed for the trainer object.  
 
 ```python
 from torch.nn import DataParallel
@@ -94,6 +94,13 @@ dp_actor = DataParallel(actor, device_ids=[0, 1])
 dp_critic = DataParallel(critic, device_ids=[0, 1])
 trainer.train(dp_actor, dp_critic)
 ```
+
+In the future, we hope to also support distributed training.  Although we could
+perform forward/backward passes in a distributed way using 
+`DistributedDataParallel`, it wouldn't really help very much, because the 
+training environment still would not be distributed.  It's possible that the 
+`dask` or `ray` libraries provide a simpler solution to this problem, but for now
+we'll just stick to single-machine training.
 
 Finally, all policies that derive from `metis.agents.Actor` can be visualized
 using the `metis.play` method.  A game window will be constructed, and the agent
@@ -112,14 +119,16 @@ callbacks.
 
 
 ## Algorithms
-| Name                                                   | Discrete | Continuous | Experience Replay | 
-|--------------------------------------------------------|----------|------------|-------------------|
-| SAC:  Soft Actor-Critic                                | &#9745;  | &#9745;    | &#9745;           |
-| TD3:  Twin-Delayed Deep Deterministic Policy Gradients |          | &#9745;    | &#9745;           |
-| DDPG:  Deep Deterministic Policy Gradients             |          | &#9745;    | &#9745;           |
-| PPO:  Proximal Policy Optimization                     | &#9745;  | &#9745;    |                   |
-| A2C:  Advantage Actor-Critic                           | &#9745;  | &#9745;    |                   |
-| VPG:  Vanilla Policy Gradients                         | &#9745;  | &#9745;    |                   |
+| Name                                                   | Discrete | Continuous | Actor-Critic | Experience Replay | 
+|--------------------------------------------------------|----------|------------|--------------|-------------------|
+| SAC:  Soft Actor-Critic                                | &#9745;  | &#9745;    | &#9745;      | &#9745;           |
+| TD3:  Twin-Delayed Deep Deterministic Policy Gradients |          | &#9745;    | &#9745;      | &#9745;           |
+| DDPG:  Deep Deterministic Policy Gradients             |          | &#9745;    | &#9745;      | &#9745;           |
+| PPO:  Proximal Policy Optimization                     | &#9745;  | &#9745;    | &#9745;      |                   |
+| A2C:  Advantage Actor-Critic                           | &#9745;  | &#9745;    | &#9745;      |                   |
+| VPG:  Vanilla Policy Gradients                         | &#9745;  | &#9745;    | &#9745;      |                   |
+| DQN:  Deep Q-Network                                   | &#9745;  | &#9745;    |              | &#9745;           |
+| DDQN:  Double Deep Q-Network                           | &#9745;  | &#9745;    |              | &#9745;           |
 
 **NOTE:**  The definition of VPG here differs from some other APIs.  Others 
 (e.g. `spinup`) define VPG using both an actor and critic network, which is 
