@@ -274,11 +274,6 @@ class DQN(Actor):
     each possible state-action pair.
 
     TODO: Finish docstring
-
-    # NOTE:
-    #     * In practice, this is typically easier to train than Critic networks (in
-    #       the traditional actor-critic sense, where the critic receives the chosen
-    #       action as input), because actions are just sparse, one-hot vectors.
     """
 
     def __init__(
@@ -304,6 +299,43 @@ class DQN(Actor):
     def forward(self, state: State, action: Action = None) -> (Action, Value):
         values = self.value(state)
         actions = values.argmax(-1)
+        return actions, values
+
+
+class DuelingDQN(Actor):
+    """Dueling Deep-Q Network (DuelingDQN), which is used as an actor in discrete
+    action spaces. Does not need to know the chosen action, but returns an
+    expected value for each possible state-action pair.
+
+    TODO: Finish docstring
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        hidden_sizes: Sequence[int] = (64, 64),
+        activation: Callable = nn.Tanh(),
+    ):
+        """
+        Parameters
+        ----------
+        state_dim: (int) Size of the state space
+        action_dim: (int) Size of the action space
+        hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
+            The first value should be the size of the input array.
+        activation: (Callable) Activation function applied to the output of
+            each layer
+        """
+        super().__init__()
+        self.value = mlp([state_dim, *hidden_sizes, 1], activation)
+        self.advantage = mlp([state_dim, *hidden_sizes, action_dim], activation)
+
+    def forward(self, state: State, action: Action = None) -> (Action, Value):
+        advantages = self.advantage(state)
+        values = self.value(state) + advantages - advantages.mean(dim=-1, keepdim=True)
+        actions = values.argmax(-1)
+
         return actions, values
 
 
@@ -504,8 +536,9 @@ def critic(
 
 def dqn(
     env: gym.Env,
-    hidden_sizes: Sequence[int] = (64, 64),
+    hidden_sizes: Sequence[int] = (256, 256),
     activation: Callable = nn.ReLU(),
+    dueling: bool = False,
 ) -> Actor:
     """Automatically generates an actor network for the given environment.
 
@@ -513,8 +546,11 @@ def dqn(
     ----------
     env: (gym.Env) Gym environment the actor will interact with
     hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.  The
-        first value should be the size of the input array.
-    activation: (Callable) Activation function applied to the output of each layer
+        first value should be the size of the input array.  Default: (256, 256)
+    activation: (Callable, optional) Activation function applied to the output
+        of each layer.  Default: nn.ReLU().
+    dueling: (bool, optional) If True, returns a DuelingDQN object, which provides
+        some additional training stability over DQN.  Default: False.
 
     Returns
     -------
@@ -522,9 +558,17 @@ def dqn(
     """
     state_space = env.observation_space
     action_space = env.action_space
-    return DQN(
-        state_space.shape[0],
-        action_space.n,
-        hidden_sizes=hidden_sizes,
-        activation=activation,
-    )
+    if dueling:
+        return DuelingDQN(
+            state_space.shape[0],
+            action_space.n,
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+        )
+    else:
+        return DQN(
+            state_space.shape[0],
+            action_space.n,
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+        )
