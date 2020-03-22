@@ -85,10 +85,6 @@ class Replay(ABC):
         Parameters
         ----------
         observation
-
-        Returns
-        -------
-
         """
         self.buffer.append([torch.as_tensor(x).detach().cpu() for x in observation])
         if len(self.buffer) > self.maxsize:
@@ -99,6 +95,10 @@ class Replay(ABC):
         """Draws samples from the memory buffer, compiles them into Tensors,
         and optionally pushes them to CPU/GPU for training RL agents.
         """
+
+    def update(self, *args):
+        """Update the weighted probabilities for sampling previous experiences"""
+        return
 
 
 class NoReplay(Replay):
@@ -121,13 +121,68 @@ class ExperienceReplay(Replay):
     and samples randomly from them for training.
     """
     # noinspection PyMethodOverriding
-    def sample(self, n: int, device: torch.device = None, **kwargs):
+    def sample(self, n: int, device: torch.device = None, **kwargs) -> Batch:
         """Draws *random* samples from the memory buffer, compiles them into
         Tensors, and optionally pushes them to CPU/GPU for training RL agents.
 
         Parameters
         ----------
-
+        n: (int) Number of samples to draw from the memory buffer
+        device: (torch.device, optional) Device where the arrays in this batch
+            should be pushed.  If not provided, arrays are left on their current
+            devices (most likely CPU, but this depends on your training algorithm
+            implementation).
         """
         idx = torch.randperm(len(self))[:n].tolist()
         return self._compile([self[i] for i in idx], device=device)
+
+
+class PER(Replay):
+    """Prioritized experience replay (PER), which stores large numbers of past
+    experiences, and draws weighted samples samples from them for training.
+    Sampling weights are proportional to the RL agent's TD error from previous
+    training iterations.
+    """
+    def __init__(self, eps: float = 1e-2):
+        super().__init__()
+        self._idx = None
+        self._probs = []
+        self._eps = eps
+
+    def append(self, observation: Observation):
+        """Appends an observation (experience) to the replay buffer.  If the
+        buffer exceeds its maximum length, then it removes the oldest samples
+        from the beginning of the buffer.
+
+        Parameters
+        ----------
+        observation
+        """
+        self.buffer.append([torch.as_tensor(x).detach().cpu() for x in observation])
+        max_prob = max(self._probs) if self._probs else 1.0
+        self._probs.append(max_prob)
+        if len(self.buffer) > self.maxsize:
+            self.buffer.pop(0)
+            self._probs.pop(0)
+
+    # noinspection PyMethodOverriding
+    def sample(self, n: int, device: torch.device = None, **kwargs) -> Batch:
+        """Draws *weighted* samples from the memory buffer, compiles them into
+        Tensors, and optionally pushes them to CPU/GPU for training RL agents.
+        Probabilities are weighted by previous TD errors for the RL agent.
+
+        Parameters
+        ----------
+        n: (int) Number of samples to draw from the memory buffer
+        device: (torch.device, optional) Device where the arrays in this batch
+            should be pushed.  If not provided, arrays are left on their current
+            devices (most likely CPU, but this depends on your training algorithm
+            implementation).
+        """
+        probs = torch.tensor(self._probs, dtype=torch.float) + self._eps
+        self._idx = torch.topk(torch.rand_like(probs) * probs, k=n)[1]
+        return self._compile([self[i] for i in self._idx], device=device)
+
+    def update(self, errors: Tensor):
+        for idx, error in zip(self._idx, errors):
+            self._probs[idx.item()] = error.item()
