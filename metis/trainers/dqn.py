@@ -14,7 +14,7 @@ from torch import Tensor
 from torch.optim import Adam
 
 from metis import utils, agents
-from metis.replay import Replay, ExperienceReplay
+from metis.replay import Replay, PER
 
 
 class DQN:
@@ -67,8 +67,10 @@ class DQN:
 
         _, values = dqn(states)
         values = values[range(len(actions)), actions.long()]
+        td_errors = (values - backup)
+        self.replay.update(td_errors.abs())
 
-        return (values - backup).pow(2).mean()
+        return td_errors.pow(2).mean()
 
     def update(
         self,
@@ -142,7 +144,7 @@ class DQN:
         device = utils.get_device(dqn)
         self.replay = replay
         if replay is None:
-            self.replay = ExperienceReplay(int(1e6))
+            self.replay = PER(int(1e6))
 
         self.optimizer = Adam(dqn.parameters(), lr=lr)
         self.target_dqn = deepcopy(dqn)

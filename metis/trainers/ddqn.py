@@ -14,7 +14,7 @@ from torch import Tensor
 from torch.optim import Adam
 
 from metis.agents import DQN
-from metis.replay import Replay, ExperienceReplay
+from metis.replay import Replay, PER
 from metis import utils
 
 
@@ -69,8 +69,10 @@ class DDQN:
 
         _, values = dqn(states)
         values = values[range(len(actions)), actions.long()]
+        td_errors = (values - backup)
+        self.replay.update(td_errors.abs())
 
-        return (values - backup).pow(2).mean()
+        return td_errors.pow(2).mean()
 
     def update(
         self,
@@ -125,7 +127,7 @@ class DDQN:
             that case, network (i + 1) acts as the Double DQN for network (i)
             during training -- the Double DQN relationship becomes circular.
         replay: (base.Replay, optional) Experience replay object for sampling
-            previous experiences.  If not provided, defaults to 'ExperienceReplay'
+            previous experiences.  If not provided, defaults to 'PER'
             with a buffer size of 1,000,000.  Users can provide a replay object,
             which is pre-populated with experiences (for specific use cases).
         steps_per_epoch: (int, optional) Number of steps of interaction
@@ -143,7 +145,7 @@ class DDQN:
         device = utils.get_device(dqns[0])
         self.replay = replay
         if replay is None:
-            self.replay = ExperienceReplay(int(1e6))
+            self.replay = PER(int(1e6))
         self.optimizers = [Adam(dqn.parameters(), lr=lr) for dqn in dqns]
 
         total_steps = steps_per_epoch * epochs
