@@ -14,8 +14,8 @@ import torch
 from torch import Tensor, nn
 import torch.nn.functional as f
 import numpy as np
-from scipy.signal import lfilter
 from numpy import ndarray
+from numba import jit
 
 from metis.agents import Actor
 
@@ -214,11 +214,9 @@ def seed(value: int):
 
 
 @numpymethod
+@jit
 def discount_values(raw_values: ndarray, dones: ndarray, discount: float) -> ndarray:
-    """Function for discounting rewards from past experience.  We use the
-    'scipy.signal.lfilter' for now, in order to match OpenAI's 'spinup' code.
-    Hopefully, we can replace this with PyTorch-only code in the near future.
-    (Would prevent the need to convert to/from Numpy arrays all the time.)
+    """Function for discounting rewards from past experience.
 
     Parameters
     ----------
@@ -233,23 +231,13 @@ def discount_values(raw_values: ndarray, dones: ndarray, discount: float) -> nda
     -------
     ndarray: Discounted reward values
     """
-    def discount_fn(vals: ndarray) -> ndarray:
-        out = lfilter([1], [1, float(-discount)], vals[::-1], axis=0)[::-1]
-        return np.ascontiguousarray(out)
+    out = raw_values.copy()
+    for i in range(out.shape[0] - 2, -1, -1):
+        if dones[i]:
+            continue
+        out[i] = discount * out[i + 1] + out[i]
 
-    if not np.any(dones > 1e-6):
-        return discount_fn(raw_values)
-
-    idx = 0
-    values = np.zeros_like(raw_values)
-    episode_ends = np.nonzero(dones > 1e-6)[0]
-    for end in episode_ends:
-        if end > idx + 1:
-            values[idx:end+1] = discount_fn(raw_values[idx:end+1])
-        idx = end + 2
-    values[idx:] = discount_fn(raw_values[idx:])
-
-    return np.ascontiguousarray(values)
+    return out
 
 
 def smooth_values(raw_values: Tensor, window: int = 10) -> Tensor:
