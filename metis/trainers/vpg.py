@@ -24,7 +24,7 @@ def actor_loss(
 
     Parameters
     ----------
-    batch: (Sequence[Tensor or Sequence[Tensor]]) Experience sampled for training.
+    batch: (Batch) Experience sampled for training.
     actor: (base.Actor) Actor (policy) network to optimize.
     gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
 

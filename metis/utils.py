@@ -185,8 +185,7 @@ def play(
             break
 
     env.close()
-    if return_frames:
-        return frames
+    return frames
 
 
 # noinspection PyUnresolvedReferences

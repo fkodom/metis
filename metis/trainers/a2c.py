@@ -5,7 +5,7 @@ Advantage Actor-Critic (A2C) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
-from typing import Iterable, Sequence, Callable
+from typing import Iterable, Sequence, Callable, List
 
 import gym
 import torch
@@ -13,12 +13,13 @@ from torch import Tensor
 from torch.optim import Adam
 
 from metis.agents import Actor, Critic, DQNCritic
+from metis.dtypes import Batch
 from metis.replay import Replay, NoReplay
 from metis import utils
 
 
 def actor_loss(
-    batch: Sequence[Tensor or Sequence[Tensor]],
+    batch: Batch,
     actor: Actor,
     critic: Critic,
     gamma: float = 0.99,
@@ -28,7 +29,7 @@ def actor_loss(
 
     Parameters
     ----------
-    batch: (Sequence[Tensor or Sequence[Tensor]]) Experience sampled for training.
+    batch: (Batch) Experience sampled for training.
     actor: (base.Actor) Actor (policy) network to optimize.
     critic: (base.Critic) Critic network to optimize.
     gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
@@ -64,7 +65,7 @@ def actor_loss(
 
 
 def critic_loss(
-    batch: Sequence[Tensor or Sequence[Tensor]],
+    batch: Batch,
     critic: Critic,
     gamma: float = 0.99,
 ) -> Tensor:
@@ -72,7 +73,7 @@ def critic_loss(
 
     Parameters
     ----------
-    batch: (Sequence[Tensor or Sequence[Tensor]]) Experience sampled for training.
+    batch: (Batch) Experience sampled for training.
     critic: (base.Critic) Critic network to optimize.
     gamma: (float, optional) Discount factor.  Range: (0, 1).  Default: 0.99
 
@@ -100,11 +101,11 @@ class A2C:
 
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
-        self.ep_rewards = []
+        self.ep_rewards: List[float] = []
 
-        self.actor_optimizer = None
-        self.critic_optimizer = None
-        self.replay = None
+        self.actor_optimizer = Adam([])
+        self.critic_optimizer = Adam([])
+        self.replay: Replay = NoReplay(1)
 
     def update(
         self,
@@ -190,9 +191,7 @@ class A2C:
         device = utils.get_device(actor)
         self.actor_optimizer = Adam(actor.parameters(), lr=actor_lr)
         self.critic_optimizer = Adam(critic.parameters(), lr=critic_lr)
-        self.replay = replay
-        if self.replay is None:
-            self.replay = NoReplay(steps_per_epoch)
+        self.replay = NoReplay(steps_per_epoch) if replay is None else replay
 
         for epoch in range(1, epochs + 1):
             state = self.env.reset()
