@@ -5,7 +5,7 @@ Replay buffers for sampling past experience during RL training.
 """
 
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Sequence, Union, List, Tuple
 
 import torch
 from torch import Tensor
@@ -14,8 +14,8 @@ from metis import utils
 
 
 # Data types, for better readability
-Observation = Sequence[Tensor or float or int or bool]
-Batch = Sequence[Tensor or Sequence[Tensor]]
+Observation = Sequence[Union[Tensor, float, int, bool]]
+Batch = Tuple[Tensor, ...]
 
 
 class Replay(ABC):
@@ -38,6 +38,7 @@ class Replay(ABC):
           environments with multiple control/state inputs).  The goal is to make
           Replay as flexible as possible.
     """
+
     def __init__(self, maxsize: int = int(1e4)):
         """
         Parameters
@@ -59,14 +60,16 @@ class Replay(ABC):
         return self.buffer.__getitem__(item)
 
     @staticmethod
-    def _compile(samples: Sequence[Observation], device: torch.device = None):
+    def _compile(
+        samples: Sequence[Tensor], device: torch.device = None
+    ) -> Tuple[Tensor, ...]:
         """Compiles all sampled observations into Tensor objects for training
         RL agents.  This is mostly just convenience method, which wraps
         'metis.utils.compile_tensors' to make subclass implementations simpler.
 
         Parameters
         ----------
-        samples: (Sequence[Observation]) Collection of raw samples taken from
+        samples: (Sequence[Tensor]) Collection of raw samples taken from
             the memory buffer, which need to be compiled into Tensors.
         device: (torch.device, optional) If specified, this method will try to
             push all resulting Tensors to that device.  Otherwise, it leaves
@@ -77,7 +80,7 @@ class Replay(ABC):
             for i in range(len(samples[0]))
         )
 
-    def append(self, observation: Observation):
+    def append(self, observation: Observation) -> None:
         """Appends an observation (experience) to the replay buffer.  If the
         buffer exceeds its maximum length, then it removes the oldest samples
         from the beginning of the buffer.
@@ -106,7 +109,8 @@ class NoReplay(Replay):
     once before training agents and completely emptying the buffer.  (I.e. there
     is no actual *replay* -- samples are only used once.)
     """
-    def sample(self, device: torch.device = None, **kwargs):
+
+    def sample(self, *args, device: torch.device = None, **kwargs):
         """Draws *all* samples from the memory buffer, compiles them into
         Tensors, and optionally pushes them to CPU/GPU for training RL agents.
         Then, empties the replay buffer.
@@ -120,8 +124,8 @@ class ExperienceReplay(Replay):
     """Basic experience replay, which stores large numbers of past experiences,
     and samples randomly from them for training.
     """
-    # noinspection PyMethodOverriding
-    def sample(self, n: int, device: torch.device = None, **kwargs) -> Batch:
+
+    def sample(self, n: int, *args, device: torch.device = None, **kwargs) -> Batch:
         """Draws *random* samples from the memory buffer, compiles them into
         Tensors, and optionally pushes them to CPU/GPU for training RL agents.
 
@@ -143,10 +147,11 @@ class PER(Replay):
     Sampling weights are proportional to the RL agent's TD error from previous
     training iterations.
     """
+
     def __init__(self, eps: float = 1e-2):
         super().__init__()
-        self._idx = None
-        self._probs = []
+        self._idx = torch.empty(1)
+        self._probs: List[float] = []
         self._eps = eps
 
     def append(self, observation: Observation):
@@ -166,7 +171,7 @@ class PER(Replay):
             self._probs.pop(0)
 
     # noinspection PyMethodOverriding
-    def sample(self, n: int, device: torch.device = None, **kwargs) -> Batch:
+    def sample(self, n: int, *args, device: torch.device = None, **kwargs) -> Batch:
         """Draws *weighted* samples from the memory buffer, compiles them into
         Tensors, and optionally pushes them to CPU/GPU for training RL agents.
         Probabilities are weighted by previous TD errors for the RL agent.

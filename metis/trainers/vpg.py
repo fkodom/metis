@@ -5,19 +5,20 @@ Vanilla Policy Gradients (VPG) algorithm for training RL agents in both
 continuous and discrete action spaces.
 """
 
-from typing import Iterable, Sequence, Callable
+from typing import Iterable, Callable, List
 
 import gym
 from torch import Tensor
-from torch.optim import Adam
+from torch.optim import Adam, Optimizer
 
 from metis.agents import Actor
+from metis.dtypes import Batch
 from metis.replay import Replay, NoReplay
 from metis import utils
 
 
 def actor_loss(
-    batch: Sequence[Tensor or Sequence[Tensor]], actor: Actor, gamma: float = 0.99,
+    batch: Batch, actor: Actor, gamma: float = 0.99,
 ) -> Tensor:
     """Computes loss for the actor network.
 
@@ -56,11 +57,11 @@ class VPG:
 
     def __init__(self, env: gym.Env):
         self.env = utils.torchenv(env)
-        self.ep_rewards = []
+        self.ep_rewards: List[float] = []
         self.avg_reward = 0.0
 
-        self.optimizer = None
-        self.replay = None
+        self.optimizer: Optimizer = Adam([])
+        self.replay: Replay = NoReplay(1)
 
     def update(self, actor: Actor, gamma: float = 0.99):
         """Performs PG update at the end of each epoch using training samples
@@ -73,6 +74,7 @@ class VPG:
         """
         device = utils.get_device(actor)
         batch = self.replay.sample(device=device)
+        assert len(batch) == 4
 
         self.optimizer.zero_grad()
         actor_loss(batch, actor, gamma=gamma).backward()
@@ -110,9 +112,7 @@ class VPG:
         """
         device = utils.get_device(actor)
         self.optimizer = Adam(actor.parameters(), lr=lr)
-        self.replay = replay
-        if self.replay is None:
-            self.replay = NoReplay(steps_per_epoch)
+        self.replay = NoReplay(steps_per_epoch) if replay is None else replay
 
         for epoch in range(1, epochs + 1):
             state = self.env.reset()

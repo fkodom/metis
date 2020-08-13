@@ -6,7 +6,7 @@ Utility functions for training and visualizing RL agents in PyTorch.
 
 from copy import deepcopy
 from time import sleep
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union, List, Tuple
 import random
 
 import gym
@@ -56,13 +56,13 @@ def numpymethod(function: Callable) -> Callable:
             return torch.as_tensor(out, dtype=torch.float)
         elif isinstance(out, tuple):
             return tuple(
-                torch.as_tensor(a, dtype=torch.float)
-                if isinstance(a, ndarray) else a for a in out
+                torch.as_tensor(a, dtype=torch.float) if isinstance(a, ndarray) else a
+                for a in out
             )
         elif isinstance(out, list):
             return [
-                torch.as_tensor(a, dtype=torch.float)
-                if isinstance(a, ndarray) else a for a in out
+                torch.as_tensor(a, dtype=torch.float) if isinstance(a, ndarray) else a
+                for a in out
             ]
         else:
             return torch.as_tensor(out)
@@ -93,9 +93,7 @@ def torchmethod(function: Callable) -> Callable:
     """
 
     def new_method(*args, **kwargs):
-        args_ = tuple(
-            torch.as_tensor(a) if isinstance(a, ndarray) else a for a in args
-        )
+        args_ = tuple(torch.as_tensor(a) if isinstance(a, ndarray) else a for a in args)
         kwargs_ = {
             k: torch.as_tensor(v) if isinstance(v, ndarray) else v
             for k, v in kwargs.items()
@@ -106,13 +104,11 @@ def torchmethod(function: Callable) -> Callable:
             return out.detach().cpu().numpy()
         elif isinstance(out, tuple):
             return tuple(
-                a.detach().cpu().numpy()
-                if isinstance(a, Tensor) else a for a in out
+                a.detach().cpu().numpy() if isinstance(a, Tensor) else a for a in out
             )
         elif isinstance(out, list):
             return [
-                a.detach().cpu().numpy()
-                if isinstance(a, Tensor) else a for a in out
+                a.detach().cpu().numpy() if isinstance(a, Tensor) else a for a in out
             ]
         else:
             return out
@@ -149,7 +145,7 @@ def play(
     max_ep_len: int = 1000,
     frame_rate: float = 9e9,
     return_frames: bool = False,
-) -> list:
+) -> Union[List, None]:
     """Wraps the Gym environment using 'torchenv', plays one episode (game),
     and visualizes the environment.  Also provides the option to return a list
     of raw frames from the episode (intended for saving videos and/or GIFs, but
@@ -179,9 +175,9 @@ def play(
 
     for turn in range(max_ep_len):
         sleep(1 / (frame_rate + 1e-6))
-        env.render(mode='human')
+        env.render(mode="human")
         if return_frames:
-            frames.append(env.render('rgb_array'))
+            frames.append(env.render("rgb_array"))
 
         action, _ = actor(state.to(device))
         state, _, done, _ = env.step(action)
@@ -264,8 +260,9 @@ def smooth_values(raw_values: Tensor, window: int = 10) -> Tensor:
 
 
 def compile_tensors(
-    inputs: Sequence[Tensor or Sequence[Tensor]], device: torch.device = None,
-) -> Tensor or Sequence[Tensor]:
+    inputs: Union[Tensor, Sequence[Tensor]],
+    device: torch.device = None,
+) -> Tensor:
     """Convenience method for compiling a sequence of values as a Tensor (or
     Sequence of Tensors), and pushing it to the specified device.  We do that
     over and over again for Experience Replay objects, so this method greatly
@@ -282,31 +279,21 @@ def compile_tensors(
     -------
     Tensor or Sequence[Tensor]:  Compiled Tensor(s)
     """
+    assert isinstance(inputs, (Tensor, Sequence))
+
     if isinstance(inputs, Tensor):
-        out = inputs
-    elif isinstance(inputs[0], Tensor):
-        out = torch.stack(tuple(inputs), dim=0)
-    elif isinstance(inputs[0], Sequence):
-        num_outputs = len(inputs[0])
-        out = tuple(
-            torch.cat([x[i] for x in inputs]) for i in range(num_outputs)
-        )
+        return inputs.to(device)
     else:
-        out = torch.tensor(inputs, dtype=torch.float)
-
-    if device is not None:
-        out = out.to(device)
-
-    return out
+        return torch.stack(inputs, dim=0).to(device)
 
 
-def get_device(obj: Tensor or nn.Module or nn.DataParallel) -> torch.device:
+def get_device(obj: Union[Tensor, nn.Module]) -> torch.device:
     """Convenience method for getting the device ID for PyTorch objects.
     Specifically, this helps get the device for 'nn.Module' objects.
 
     Parameters
     ----------
-    obj: (PyTorch object) Object to get the device for.
+    obj: (Tensor or nn.Module) Object to get the device for.
 
     Returns
     -------
@@ -317,7 +304,5 @@ def get_device(obj: Tensor or nn.Module or nn.DataParallel) -> torch.device:
     elif isinstance(obj, nn.Module):
         for p in obj.parameters():
             return p.device
-    elif isinstance(obj, nn.DataParallel):
-        return obj.output_device
     else:
-        raise TypeError(f"Could not get device for type {type(obj)}")
+        raise ValueError(f"Can't get device of type '{type(obj)}'")

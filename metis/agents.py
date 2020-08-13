@@ -5,31 +5,26 @@ Common types of Actor/Critic networks for reinforcement learning.
 """
 
 from abc import ABC, abstractmethod
-from typing import Sequence, Callable
+from typing import Sequence, Tuple, List
 from math import log
 
 import gym
 import torch
-from torch import Tensor, nn
+import torch.nn as nn
 import torch.nn.functional as f
 from torch.distributions import Normal, Categorical
+
+from metis.dtypes import State, Action, LogProb, Value
 
 # Max/min values for clipping log probabilities
 LOG_STD_MIN = -20
 LOG_STD_MAX = 2
 
 
-# Common data types for actor/critic modules -- for better readability
-State = Tensor or Sequence[Tensor]
-Action = Tensor or float or int
-LogProb = Tensor or Sequence[Tensor]
-Value = Tensor
-
-
 def mlp(
     sizes: Sequence[int],
-    activation: Callable,
-    output_activation: Callable = nn.Identity(),
+    activation: nn.Module,
+    output_activation: nn.Module = nn.Identity(),
 ) -> nn.Module:
     """Convenience method for creating a multi-layer perceptrons in PyTorch.
     Very commonly used as the backbone for RL agents, especially when the
@@ -39,8 +34,8 @@ def mlp(
     ----------
     sizes: (Sequence[int]) Sizes of the MLP linear layers.  The first value should
         be the size of the input array.
-    activation: (Callable) Activation function applied to the output of each layer
-    output_activation: (Callable, optional) Activation function applied to the
+    activation: (nn.Module) Activation function applied to the output of each layer
+    output_activation: (nn.Module, optional) Activation function applied to the
         final output of the multi-layer perceptron.  Default: nn.Identity()
         (i.e. no activation).  Softmax is often used for discrete action spaces.
 
@@ -48,7 +43,7 @@ def mlp(
     -------
     nn.Module: Multi-layer perception (AKA feedforward neural network)
     """
-    layers = []
+    layers: List[nn.Module] = []
     for j in range(len(sizes) - 1):
         act = activation if j < len(sizes) - 2 else output_activation
         layers += [nn.Linear(sizes[j], sizes[j + 1]), act]
@@ -76,7 +71,7 @@ class Actor(nn.Module, ABC):
         super().__init__()
 
     @abstractmethod
-    def forward(self, state: State) -> (Action, LogProb):
+    def forward(self, state: State) -> Tuple[Action, LogProb]:
         """Computes action and log action probability for the given state."""
 
 
@@ -94,7 +89,7 @@ class CategoricalActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
+        activation: nn.Module = nn.Tanh(),
     ):
         """
         Parameters
@@ -103,13 +98,13 @@ class CategoricalActor(Actor):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
         """
         super().__init__()
         self.logits = mlp([state_dim, *hidden_sizes, action_dim], activation=activation)
 
-    def forward(self, state: State, action: Action = None) -> (Action, LogProb):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, LogProb]:
         probs = torch.softmax(self.logits(state), dim=-1)
         dist = Categorical(probs=probs)
         if action is None:
@@ -130,8 +125,8 @@ class GaussianActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
-        output_activation: Callable = nn.Identity(),
+        activation: nn.Module = nn.Tanh(),
+        output_activation: nn.Module = nn.Identity(),
         action_limit: float = 1.0,
     ):
         """
@@ -141,9 +136,9 @@ class GaussianActor(Actor):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
-        output_activation: (Callable, optional) Activation function applied to the
+        output_activation: (nn.Module, optional) Activation function applied to the
             final output of the multi-layer perceptron.  Default: nn.Identity().
         action_limit: (float, optional) Scales the range of actions returned by
             the agent.  Default: 1.0.
@@ -159,7 +154,7 @@ class GaussianActor(Actor):
             -0.5 * torch.ones(action_dim, dtype=torch.float), requires_grad=True
         )
 
-    def forward(self, state: State, action: Action = None) -> (Action, LogProb):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, LogProb]:
         mu = self.action_limit * self.mu(state)
         std = torch.exp(self.log_sigma)
         dist = Normal(mu, std)
@@ -183,8 +178,8 @@ class DeterministicGaussianActor(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
-        output_activation: Callable = nn.Identity(),
+        activation: nn.Module = nn.Tanh(),
+        output_activation: nn.Module = nn.Identity(),
         action_limit: float = 1.0,
     ):
         """
@@ -194,9 +189,9 @@ class DeterministicGaussianActor(Actor):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
-        output_activation: (Callable, optional) Activation function applied to the
+        output_activation: (nn.Module, optional) Activation function applied to the
             final output of the multi-layer perceptron.  Default: nn.Identity().
         action_limit: (float, optional) Scales the range of actions returned by
             the agent.  Default: 1.0.
@@ -209,7 +204,7 @@ class DeterministicGaussianActor(Actor):
             output_activation=output_activation,
         )
 
-    def forward(self, state: State, action: Action = None) -> (Action, None):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, LogProb]:
         return self.action_limit * self.layers(state), None
 
 
@@ -251,7 +246,7 @@ class SquashedGaussianActor(Actor):
             -0.5 * torch.ones(action_dim, dtype=torch.float), requires_grad=True
         )
 
-    def forward(self, state: State, action: Action = None) -> (Action, LogProb):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, LogProb]:
         mu = self.mu(state)
         sigma = self.log_sigma.clamp(LOG_STD_MIN, LOG_STD_MAX).exp()
         dist = Normal(mu, sigma)
@@ -263,7 +258,7 @@ class SquashedGaussianActor(Actor):
         # This is a more numerically-stable equivalent to Eq 21.
         logprob = dist.log_prob(action).sum(dim=-1)
         logprob -= 2 * (log(2) - action - f.softplus(-2 * action)).sum(dim=-1)
-        action = self.action_limit * torch.tanh(action)
+        action = self.action_limit * torch.tanh(torch.as_tensor(action))
 
         return action, logprob
 
@@ -281,7 +276,7 @@ class DQN(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
+        activation: nn.Module = nn.Tanh(),
     ):
         """
         Parameters
@@ -290,13 +285,13 @@ class DQN(Actor):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
         """
         super().__init__()
         self.value = mlp([state_dim, *hidden_sizes, action_dim], activation)
 
-    def forward(self, state: State, action: Action = None) -> (Action, Value):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, Value]:
         values = self.value(state)
         actions = values.argmax(-1)
         return actions, values
@@ -315,7 +310,7 @@ class DuelingDQN(Actor):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
+        activation: nn.Module = nn.Tanh(),
     ):
         """
         Parameters
@@ -324,14 +319,14 @@ class DuelingDQN(Actor):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
         """
         super().__init__()
         self.value = mlp([state_dim, *hidden_sizes, 1], activation)
         self.advantage = mlp([state_dim, *hidden_sizes, action_dim], activation)
 
-    def forward(self, state: State, action: Action = None) -> (Action, Value):
+    def forward(self, state: State, action: Action = None) -> Tuple[Action, Value]:
         advantages = self.advantage(state)
         values = self.value(state) + advantages - advantages.mean(dim=-1, keepdim=True)
         actions = values.argmax(-1)
@@ -378,7 +373,7 @@ class GaussianCritic(Critic):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
+        activation: nn.Module = nn.Tanh(),
     ):
         """
         Parameters
@@ -387,7 +382,7 @@ class GaussianCritic(Critic):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
         """
         super().__init__()
@@ -396,7 +391,7 @@ class GaussianCritic(Critic):
         )
 
     def forward(self, state: State, action: Action) -> Value:
-        inputs = torch.cat([state, action], dim=-1)
+        inputs = torch.cat([state, torch.as_tensor(action)], dim=-1)
         return self.value(inputs).squeeze(-1)
 
 
@@ -416,7 +411,7 @@ class DQNCritic(Critic):
         state_dim: int,
         action_dim: int,
         hidden_sizes: Sequence[int] = (64, 64),
-        activation: Callable = nn.Tanh(),
+        activation: nn.Module = nn.Tanh(),
     ):
         """
         Parameters
@@ -425,7 +420,7 @@ class DQNCritic(Critic):
         action_dim: (int) Size of the action space
         hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.
             The first value should be the size of the input array.
-        activation: (Callable) Activation function applied to the output of
+        activation: (nn.Module) Activation function applied to the output of
             each layer
         """
         super().__init__()
@@ -441,8 +436,8 @@ class DQNCritic(Critic):
 def actor(
     env: gym.Env,
     hidden_sizes: Sequence[int] = (64, 64),
-    activation: Callable = nn.ReLU(),
-    output_activation: Callable = nn.Identity(),
+    activation: nn.Module = nn.ReLU(),
+    output_activation: nn.Module = nn.Identity(),
     action_limit: float = 1.0,
     deterministic: bool = False,
     squashed: bool = False,
@@ -454,8 +449,8 @@ def actor(
     env: (gym.Env) Gym environment the actor will interact with
     hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.  The
         first value should be the size of the input array.
-    activation: (Callable) Activation function applied to the output of each layer
-    output_activation: (Callable, optional) Activation function applied to the
+    activation: (nn.Module) Activation function applied to the output of each layer
+    output_activation: (nn.Module, optional) Activation function applied to the
         final output of the multi-layer perceptron.  Default: nn.Identity()
         (i.e. no activation).  Softmax is often used for discrete action spaces.
     action_limit: (float, optional) For continuous agents, scales the range of
@@ -509,7 +504,7 @@ def actor(
 def critic(
     env: gym.Env,
     hidden_sizes: Sequence[int] = (64, 64),
-    activation: Callable = nn.Tanh(),
+    activation: nn.Module = nn.Tanh(),
 ) -> Critic:
     """Automatically generates a critic network for the given environment.
 
@@ -518,7 +513,7 @@ def critic(
     env: (gym.Env) Gym environment the actor will interact with
     hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.  The
         first value should be the size of the input array.
-    activation: (Callable) Activation function applied to the output of each layer
+    activation: (nn.Module) Activation function applied to the output of each layer
 
     Returns
     -------
@@ -537,7 +532,7 @@ def critic(
 def dqn(
     env: gym.Env,
     hidden_sizes: Sequence[int] = (256, 256),
-    activation: Callable = nn.ReLU(),
+    activation: nn.Module = nn.ReLU(),
     dueling: bool = False,
 ) -> Actor:
     """Automatically generates an actor network for the given environment.
@@ -547,7 +542,7 @@ def dqn(
     env: (gym.Env) Gym environment the actor will interact with
     hidden_sizes: (Sequence[int], optional) Sizes of the MLP linear layers.  The
         first value should be the size of the input array.  Default: (256, 256)
-    activation: (Callable, optional) Activation function applied to the output
+    activation: (nn.Module, optional) Activation function applied to the output
         of each layer.  Default: nn.ReLU().
     dueling: (bool, optional) If True, returns a DuelingDQN object, which provides
         some additional training stability over DQN.  Default: False.
