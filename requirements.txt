@@ -2,3 +2,6 @@ gym
 torch>=1.3.0
 numpy
 numba
+
+# Dashboard only
+streamlit

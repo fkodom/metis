@@ -1,3 +1,6 @@
 __pycache__
 .idea
 .vscode
+build
+dist
+metis.egg-info
