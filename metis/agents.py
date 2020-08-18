@@ -567,3 +567,37 @@ def dqn(
             hidden_sizes=hidden_sizes,
             activation=activation,
         )
+
+
+DEFAULT_AGENTS: dict = {
+    "DDQN": {
+        "dqn": {"dueling": True},
+    },
+    "SAC": {
+        "actor": {"hidden_sizes": (256, 256), "squashed": True},
+        "critic": {"hidden_sizes": (256, 256)},
+    },
+    "TD3": {
+        "actor": {
+            "hidden_sizes": (256, 256),
+            "output_activation": nn.Tanh(),
+            "deterministic": True,
+        },
+        "critic": {"hidden_sizes": (256, 256)},
+    },
+}
+
+
+def default_actor(env: gym.Env, trainer: object) -> Actor:
+    kwargs = DEFAULT_AGENTS.get(trainer.__class__.__name__, {}).get("actor", {})
+    return actor(env, **kwargs)
+
+
+def default_critic(env: gym.Env, trainer: object) -> Critic:
+    kwargs = DEFAULT_AGENTS.get(trainer.__class__.__name__, {}).get("critic", {})
+    return critic(env, **kwargs)
+
+
+def default_dqn(env: gym.Env, trainer: object) -> Critic:
+    kwargs = DEFAULT_AGENTS.get(trainer.__class__.__name__, {}).get("dqn", {})
+    return dqn(env, **kwargs)
